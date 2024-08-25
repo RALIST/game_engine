@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"config"
+	"github.com/ralist/game_engine/config"
 )
 
 // Interfaces

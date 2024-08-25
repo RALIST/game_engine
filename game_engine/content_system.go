@@ -3,18 +3,8 @@ package game_engine
 import (
 	"fmt"
 
-	"config"
-
+	"github.com/ralist/game_engine/config"
 	"gopkg.in/yaml.v2"
-)
-
-const (
-	ResourceContent    ContentType = "resource"
-	BuildingContent    ContentType = "building"
-	UpgradeContent     ContentType = "upgrade"
-	AchievementContent ContentType = "achievement"
-	ShinyContent       ContentType = "shiny"
-	CustomContent      ContentType = "custom"
 )
 
 type ContentSystem struct {

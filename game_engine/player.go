@@ -3,7 +3,7 @@ package game_engine
 import (
 	"time"
 
-	"config"
+	"github.com/ralist/game_engine/config"
 )
 
 const maxLogEntries = 10

@@ -1,4 +1,4 @@
-package game_engine
+package config
 
 import (
 	"os"
