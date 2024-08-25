@@ -1,112 +1,113 @@
-resources:
-  gold:
-    initial: 1000
-  money:
-    initial: 1000
-  energy:
-    initial: 1000
+content:
+  resources:
+    gold:
+      initial: 1000
+    money:
+      initial: 1000
+    energy:
+      initial: 1000
 
-buildings:
-  pan:
-    name: Gold Pan
-    description: A simple tool for panning gold from rivers
-    cost:
-      money: 5
-    effects:
-      - type: yield
-        target: gold
-        expression: 0.1 * (1 + 0.1 * tier)
-  sluice:
-    name: Sluice Box
-    description: An efficient way to separate gold from sediment
-    cost:
-      money: 50
-      gold: 5
-    effects:
-      - type: yield
-        target: gold
-        expression: 1 * (1 + 0.2 * tier)
-  mine:
-    name: Gold Mine
-    description: A deep mine for extracting gold from the earth
-    cost:
-      money: 500
-      gold: 50
-    effects:
-      - type: yield
-        target: gold
-        expression: 10 * (1 + 0.3 * tier)
+  buildings:
+    pan:
+      name: Gold Pan
+      description: A simple tool for panning gold from rivers
+      cost:
+        money: 5
+      effects:
+        - type: yield
+          target: gold
+          expression: 0.1 * (1 + 0.1 * tier)
+    sluice:
+      name: Sluice Box
+      description: An efficient way to separate gold from sediment
+      cost:
+        money: 50
+        gold: 5
+      effects:
+        - type: yield
+          target: gold
+          expression: 1 * (1 + 0.2 * tier)
+    mine:
+      name: Gold Mine
+      description: A deep mine for extracting gold from the earth
+      cost:
+        money: 500
+        gold: 50
+      effects:
+        - type: yield
+          target: gold
+          expression: 10 * (1 + 0.3 * tier)
 
-upgrades:
-  prospectingSkill:
-    name: Prospecting Skill
-    description: Improve your ability to find gold
+  upgrades:
+    prospectingSkill:
+      name: Prospecting Skill
+      description: Improve your ability to find gold
+      cost:
+        money: 20
+      effects:
+        - type: multiply
+          target: gold
+          value: 1.5
+    miningEquipment:
+      name: Mining Equipment
+      description: Better tools for more efficient gold extraction
+      cost:
+        money: 100
+        gold: 10
+      effects:
+        - type: multiply
+          target: gold
+          value: 2
+    refineryTech:
+      name: Refinery Technology
+      description: Advanced technology for processing gold ore
+      cost:
+        money: 1000
+        gold: 100
+      effects:
+        - type: multiply
+          target: gold
+          value: 3
+
+  achievements:
+    - name: Novice Prospector
+      description: Pan your first gold nugget
+      condition: gold >= 1
+    - name: Gold Rush Fever
+      description: Accumulate 100 gold
+      condition: gold >= 100
+    - name: Mining Magnate
+      description: Own 5 of each type of mining operation
+      condition: pan >= 5 && sluice >= 5 && mine >= 5
+
+  shinies:
+    goldNugget:
+      name: Large Gold Nugget
+      description: You've stumbled upon a large gold nugget!
+      frequency: 300
+      duration: 10
+      effects:
+        - type: yield
+          target: gold
+          value: 50
+    energyBoost:
+      name: Energy Boost
+      description: A surge of energy allows you to work harder!
+      frequency: 600
+      duration: 30
+      effects:
+        - type: yield
+          target: energy
+          value: 50
+
+  prestige:
+    name: Invest in New Territory
+    description: Start fresh in a new, more promising territory
     cost:
-      money: 20
+      gold: 1000
     effects:
       - type: multiply
         target: gold
-        value: 1.5
-  miningEquipment:
-    name: Mining Equipment
-    description: Better tools for more efficient gold extraction
-    cost:
-      money: 100
-      gold: 10
-    effects:
-      - type: multiply
-        target: gold
-        value: 2
-  refineryTech:
-    name: Refinery Technology
-    description: Advanced technology for processing gold ore
-    cost:
-      money: 1000
-      gold: 100
-    effects:
-      - type: multiply
-        target: gold
-        value: 3
-
-achievements:
-  - name: Novice Prospector
-    description: Pan your first gold nugget
-    condition: gold >= 1
-  - name: Gold Rush Fever
-    description: Accumulate 100 gold
-    condition: gold >= 100
-  - name: Mining Magnate
-    description: Own 5 of each type of mining operation
-    condition: pan >= 5 && sluice >= 5 && mine >= 5
-
-shinies:
-  goldNugget:
-    name: Large Gold Nugget
-    description: You've stumbled upon a large gold nugget!
-    frequency: 300
-    duration: 10
-    effects:
-      - type: yield
-        target: gold
-        value: 50
-  energyBoost:
-    name: Energy Boost
-    description: A surge of energy allows you to work harder!
-    frequency: 600
-    duration: 30
-    effects:
-      - type: yield
-        target: energy
-        value: 50
-
-prestige:
-  name: Invest in New Territory
-  description: Start fresh in a new, more promising territory
-  cost:
-    gold: 1000
-  effects:
-    - type: multiply
-      target: gold
-      value: 1.1
-    - type: reset
-      target: all
+        value: 1.1
+      - type: reset
+        target: all

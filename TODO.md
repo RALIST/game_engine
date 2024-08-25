@@ -1,0 +1,30 @@
+# TODOs
+
+- [ ] Implement offline progress calculation
+- [ ] Add welcome back screen for returning players
+- [ ] Develop multi-layer prestige system
+- [ ] Create meta-upgrades for prestige system
+- [ ] Design and implement challenge system
+- [ ] Add time-limited events functionality
+- [ ] Develop automation features (auto-buyers, auto-upgraders)
+- [ ] Expand upgrade system for complex multipliers and bonuses
+- [ ] Implement temporary boosts mechanism
+- [ ] Create comprehensive statistics tracking system
+- [ ] Design and add milestone system
+- [ ] Implement resource conversion mechanics
+- [ ] Develop research/technology tree feature
+- [ ] Add mini-games for additional engagement
+- [ ] Implement system for random events and discoveries
+- [ ] Create customization options for players
+- [ ] Expand achievement system to include rewards
+- [ ] Implement prestige currency for meta-upgrades
+- [ ] Add time warp functionality
+- [ ] Balance idle vs. active play mechanics
+- [ ] Develop basic social features
+- [ ] Implement cloud save functionality
+- [ ] Create in-game notification system
+- [ ] Design expandable content system
+- [ ] Implement dynamic difficulty adjustment
+- [ ] Develop interactive tutorial system
+- [ ] Add accessibility features
+- [ ] Optimize performance for large numbers

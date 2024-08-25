@@ -1,21 +1,19 @@
 package config
 
 import (
-	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v2"
 )
 
 type GameConfig struct {
-	Resources    map[string]Resource `yaml:"resources"`
-	Upgrades     map[string]Upgrade  `yaml:"upgrades"`
-	Buildings    map[string]Building `yaml:"buildings"`
-	Achievements []Achievement       `yaml:"achievements"`
-	Shinies      map[string]Shiny    `yaml:"shinies"`
-	Templates    map[string]Template `yaml:"templates"`
-	Includes     map[string]Include  `yaml:"includes"`
-	Prestige     Prestige            `yaml:"prestige"`
+	Content map[string]map[string]interface{} `yaml:"content"`
+}
+
+type CustomContent struct {
+	Name        string                 `yaml:"name"`
+	Description string                 `yaml:"description"`
+	Properties  map[string]interface{} `yaml:"properties"`
 }
 
 type Prestige struct {
@@ -102,60 +100,60 @@ func LoadConfig(filename string) (*GameConfig, error) {
 		return nil, err
 	}
 
-	err = config.ProcessTemplatesAndIncludes()
-	if err != nil {
-		return nil, err
-	}
+	// err = config.ProcessTemplatesAndIncludes()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return &config, nil
 }
 
-func (gc *GameConfig) ProcessTemplatesAndIncludes() error {
-	for name, include := range gc.Includes {
-		for _, templateName := range include.Templates {
-			template, ok := gc.Templates[templateName]
-			if !ok {
-				return fmt.Errorf("template not found: %s", templateName)
-			}
+// func (gc *GameConfig) ProcessTemplatesAndIncludes() error {
+// 	for name, include := range gc.Includes {
+// 		for _, templateName := range include.Templates {
+// 			template, ok := gc.Templates[templateName]
+// 			if !ok {
+// 				return fmt.Errorf("template not found: %s", templateName)
+// 			}
 
-			switch template.Type {
-			case "upgrade":
-				upgrade := Upgrade{
-					Name:        name,
-					Description: template.Description,
-					Cost:        template.Cost,
-					Effects:     template.Effects,
-				}
-				for k, v := range include.Replacements {
-					switch k {
-					case "description":
-						upgrade.Description = v.(string)
-					case "cost":
-						upgrade.Cost = v.(map[string]float64)
-					}
-				}
-				gc.Upgrades[name] = upgrade
-			case "building":
-				building := Building{
-					Name:        name,
-					Description: template.Description,
-					Cost:        template.Cost,
-					Effects:     template.Effects,
-					Tier:        template.Tier,
-				}
-				for k, v := range include.Replacements {
-					switch k {
-					case "description":
-						building.Description = v.(string)
-					case "cost":
-						building.Cost = v.(map[string]float64)
-					case "tier":
-						building.Tier = v.(int)
-					}
-				}
-				gc.Buildings[name] = building
-			}
-		}
-	}
-	return nil
-}
+// 			switch template.Type {
+// 			case "upgrade":
+// 				upgrade := Upgrade{
+// 					Name:        name,
+// 					Description: template.Description,
+// 					Cost:        template.Cost,
+// 					Effects:     template.Effects,
+// 				}
+// 				for k, v := range include.Replacements {
+// 					switch k {
+// 					case "description":
+// 						upgrade.Description = v.(string)
+// 					case "cost":
+// 						upgrade.Cost = v.(map[string]float64)
+// 					}
+// 				}
+// 				gc.Upgrades[name] = upgrade
+// 			case "building":
+// 				building := Building{
+// 					Name:        name,
+// 					Description: template.Description,
+// 					Cost:        template.Cost,
+// 					Effects:     template.Effects,
+// 					Tier:        template.Tier,
+// 				}
+// 				for k, v := range include.Replacements {
+// 					switch k {
+// 					case "description":
+// 						building.Description = v.(string)
+// 					case "cost":
+// 						building.Cost = v.(map[string]float64)
+// 					case "tier":
+// 						building.Tier = v.(int)
+// 					}
+// 				}
+// 				gc.Buildings[name] = building
+// 			}
+// 		}
+// 	}
+// 	return nil
+// }
