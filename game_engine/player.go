@@ -3,7 +3,7 @@ package game_engine
 import (
 	"time"
 
-	"github.com/yourusername/idle-game-engine/config"
+	"config"
 )
 
 const maxLogEntries = 10

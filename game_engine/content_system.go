@@ -3,7 +3,8 @@ package game_engine
 import (
 	"fmt"
 
-	"github.com/ralist/idle-game-engine/config"
+	"config"
+
 	"gopkg.in/yaml.v2"
 )
 

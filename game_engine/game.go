@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/yourusername/idle-game-engine/config"
+	"config"
 )
 
 // Interfaces
