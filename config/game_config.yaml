@@ -1,0 +1,135 @@
+resources:
+  coins:
+    initial: 0
+  gems:
+    initial: 0
+
+upgrades:
+  coinMultiplier:
+    name: Coin Multiplier
+    description: Doubles your coin production
+    cost:
+      coins: 100
+    effects:
+      - type: multiply
+        target: coins
+        value: 2
+  gemMultiplier:
+    name: Gem Multiplier
+    description: Doubles your gem production
+    cost:
+      gems: 1000
+    effects:
+      - type: multiply
+        target: gems
+        value: 2
+  coinDoubler:
+    name: Coin Doubler
+    description: Doubles your coin production
+    cost:
+      coins: 5000
+    effects:
+      - type: multiply
+        target: coins
+        value: 2
+  gemDoubler:
+    name: Gem Doubler
+    description: Doubles your gem production
+    cost:
+      gems: 50000
+    effects:
+      - type: multiply
+        target: gems
+        value: 2
+
+buildings:
+  coinMiner:
+    name: Coin Miner
+    description: Generates [1*(tier)] coins per second
+    cost:
+      coins: 10
+    effects:
+      - type: yield
+        target: coins
+        expression: 1 * tier
+  gemMiner:
+    name: Gem Miner
+    description: Generates [0.1*(tier)] gems per second
+    cost:
+      gems: 100
+    effects:
+      - type: yield
+        target: gems
+        expression: 0.1 * tier
+  superMiner:
+    name: Super Miner
+    description: Generates both coins and gems!
+    cost:
+      coins: 10000
+      gems: 1000
+    effects:
+      - type: yield
+        target: coins
+        expression: 10 * tier
+      - type: yield
+        target: gems
+        expression: 1 * tier
+
+achievements:
+  - name: First Coins
+    description: Earn your first 100 coins
+    condition: coins >= 100
+  - name: Gem Collector
+    description: Collect 10 gems
+    condition: gems >= 10
+  - name: Mining Tycoon
+    description: Own 10 of each type of miner
+    condition: coinMiner >= 10 && gemMiner >= 10
+
+shinies:
+  goldenCoin:
+    name: Golden Coin
+    description: A rare golden coin appears!
+    frequency: 300
+    duration: 10
+    effects:
+      - type: yield
+        target: coins
+        value: 1000
+  rareDiamond:
+    name: Rare Diamond
+    description: A super rare diamond appears!
+    frequency: 900
+    duration: 5
+    effects:
+      - type: yield
+        target: gems
+        value: 100
+
+templates:
+  basicUpgrade:
+    type: upgrade
+    content:
+      description: A basic upgrade
+      cost:
+        coins: 50
+      effects:
+        - type: yield
+          target: coins
+          value: 5
+
+includes:
+  doubleResourceUpgrade:
+    name: doubleResourceUpgrade
+    parameters:
+      - resourceName
+      - baseCost
+    content: |
+      name: Double [resourceName] Production
+      description: Doubles your [resourceName] production
+      cost:
+        [resourceName]: [baseCost]
+      effects:
+        - type: multiply
+          target: [resourceName]
+          value: 2
