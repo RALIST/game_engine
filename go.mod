@@ -1,4 +1,4 @@
-module github.com/ralist/idle-game-engine
+module github.com/ralist/game_engine
 
 go 1.16
 
