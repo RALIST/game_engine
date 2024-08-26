@@ -3,33 +3,38 @@ package game_engine
 import (
 	"fmt"
 	"github.com/ralist/game_engine/game_engine/config"
+	"log"
 
 	"gopkg.in/yaml.v2"
 )
 
+type Thing interface {
+}
+
 type ContentSystem struct {
-	config        *config.GameConfig
-	Resources     map[string]config.Resource
-	Buildings     map[string]config.Building
-	Upgrades      map[string]config.Upgrade
-	Achievements  []config.Achievement
-	Shinies       map[string]config.Shiny
-	Prestige      config.Prestige
-	CustomContent map[string]map[string]config.CustomContent
+	config       *config.GameConfig
+	Resources    map[string]config.Resource
+	Buildings    map[string]config.Building
+	Upgrades     map[string]config.Upgrade
+	Achievements []config.Achievement
+	Things       map[string]config.Thing
+	Shinies      map[string]config.Shiny
+	Prestige     config.Prestige
 }
 
 func NewContentSystem(cfg *config.GameConfig) (*ContentSystem, error) {
 	cs := &ContentSystem{
-		config:        cfg,
-		Resources:     make(map[string]config.Resource),
-		Buildings:     make(map[string]config.Building),
-		Upgrades:      make(map[string]config.Upgrade),
-		Achievements:  []config.Achievement{},
-		Shinies:       make(map[string]config.Shiny),
-		CustomContent: make(map[string]map[string]config.CustomContent),
+		config:       cfg,
+		Resources:    make(map[string]config.Resource),
+		Buildings:    make(map[string]config.Building),
+		Upgrades:     make(map[string]config.Upgrade),
+		Achievements: []config.Achievement{},
+		Shinies:      make(map[string]config.Shiny),
+		Things:       make(map[string]config.Thing),
 	}
 
 	err := cs.parseContent()
+	log.Println(cs.Things)
 	if err != nil {
 		return nil, err
 	}
@@ -59,13 +64,9 @@ func (cs *ContentSystem) parseContent() error {
 			if err := cs.parseShinies(content); err != nil {
 				return err
 			}
-		case "prestige":
-			if err := cs.parsePrestige(content); err != nil {
-				return err
-			}
 		default:
 			// Treat any other category as custom content
-			if err := cs.parseCustomContent(category, content); err != nil {
+			if err := cs.parseThings(content); err != nil {
 				return err
 			}
 		}
@@ -73,20 +74,14 @@ func (cs *ContentSystem) parseContent() error {
 	return nil
 }
 
-func (cs *ContentSystem) parsePrestige(content interface{}) error {
-	return remarshal(content, &cs.Prestige)
-}
-
-func (cs *ContentSystem) parseCustomContent(category string, content map[string]interface{}) error {
-	categoryContent := make(map[string]config.CustomContent)
+func (cs *ContentSystem) parseThings(content map[string]interface{}) error {
 	for name, data := range content {
-		var customContent config.CustomContent
-		if err := remarshal(data, &customContent); err != nil {
-			return fmt.Errorf("error parsing custom content %s in category %s: %v", name, category, err)
+		var thing config.Thing
+		if err := remarshal(data, &thing); err != nil {
+			return fmt.Errorf("error parsing resource %s: %v", name, err)
 		}
-		categoryContent[name] = customContent
+		cs.Things[name] = thing
 	}
-	cs.CustomContent[category] = categoryContent
 	return nil
 }
 
@@ -231,28 +226,4 @@ func (cs *ContentSystem) GetAllAchievements() []config.Achievement {
 
 func (cs *ContentSystem) GetAllShinies() map[string]config.Shiny {
 	return cs.Shinies
-}
-
-func (cs *ContentSystem) GetCustomContent(category, name string) (config.CustomContent, bool) {
-	if categoryContent, ok := cs.CustomContent[category]; ok {
-		if content, ok := categoryContent[name]; ok {
-			return content, true
-		}
-	}
-	return config.CustomContent{}, false
-}
-
-func (cs *ContentSystem) GetAllCustomContentCategories() []string {
-	categories := make([]string, 0, len(cs.CustomContent))
-	for category := range cs.CustomContent {
-		categories = append(categories, category)
-	}
-	return categories
-}
-
-func (cs *ContentSystem) GetAllCustomContentInCategory(category string) map[string]config.CustomContent {
-	if categoryContent, ok := cs.CustomContent[category]; ok {
-		return categoryContent
-	}
-	return nil
 }

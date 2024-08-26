@@ -107,14 +107,15 @@ content:
           target: energy
           value: 50
 
-  prestige:
-    name: Invest in New Territory
-    description: Start fresh in a new, more promising territory
-    cost:
-      gold: 1000
-    effects:
-      - type: multiply
-        target: gold
-        value: 1.1
-      - type: reset
-        target: all
+  others:
+    prestige:
+      name: Invest in New Territory
+      description: Start fresh in a new, more promising territory
+      cost:
+        gold: 1000
+      effects:
+        - type: multiply
+          target: gold
+          value: 1.1
+        - type: reset
+          target: all

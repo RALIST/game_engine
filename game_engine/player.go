@@ -9,7 +9,7 @@ const maxLogEntries = 10
 type PlayerState struct {
 	Resources         map[string]float64    `json:"resources"`
 	Upgrades          map[string]bool       `json:"upgrades"`
-	Buildings         map[string]int        `json:"buildings"`
+	Buildings         map[string]float64    `json:"buildings"`
 	Achievements      map[string]bool       `json:"achievements"`
 	Shinies           map[string]ShinyState `json:"shinies"`
 	Prestige          int                   `json:"prestige"`
@@ -58,8 +58,8 @@ func initResources(cfg *ContentSystem) map[string]float64 {
 	return resources
 }
 
-func initBuildings(cfg *ContentSystem) map[string]int {
-	buildings := make(map[string]int)
+func initBuildings(cfg *ContentSystem) map[string]float64 {
+	buildings := make(map[string]float64)
 	for name, building := range cfg.Buildings {
 		buildings[name] = building.Initial
 	}
@@ -127,7 +127,7 @@ func (p *Player) ResetProgress() {
 }
 
 // GetBuildingAmount возвращает количество зданий определенного типа
-func (p *Player) GetBuildingAmount(buildingName string) int {
+func (p *Player) GetBuildingAmount(buildingName string) float64 {
 	return p.State.Buildings[buildingName]
 }
 

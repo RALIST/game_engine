@@ -93,7 +93,7 @@ func (ge *GameEngine) GetPlayerResources(playerID string) (map[string]float64, e
 	return player.State.Resources, nil
 }
 
-func (ge *GameEngine) GetPlayerBuildings(playerID string) (map[string]int, error) {
+func (ge *GameEngine) GetPlayerBuildings(playerID string) (map[string]float64, error) {
 	player, err := ge.loadPlayer(playerID)
 	if err != nil {
 		return nil, err

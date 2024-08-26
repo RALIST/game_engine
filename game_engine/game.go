@@ -147,14 +147,14 @@ func (g *Game) applyShinyEffect(player *Player, shiny config.Shiny) {
 	}
 }
 
-func (g *Game) calculateCost(baseCost map[string]float64, owned int) map[string]float64 {
+func (g *Game) calculateCost(baseCost map[string]float64, owned float64) map[string]float64 {
 	cost := make(map[string]float64)
 	for resource, amount := range baseCost {
 		expression := fmt.Sprintf("%f * %d", amount, owned+1)
 		result, err := g.evaluateExpression(expression, nil)
 		if err != nil {
 			log.Printf("Error calculating cost for resource %s: %v", resource, err)
-			cost[resource] = amount * float64(owned+1) // Fallback to simple multiplication
+			cost[resource] = amount * (owned + 1) // Fallback to simple multiplication
 		} else {
 			cost[resource] = result
 		}
