@@ -3,227 +3,181 @@ package game_engine
 import (
 	"fmt"
 	"github.com/ralist/game_engine/game_engine/config"
-	"log"
-
-	"gopkg.in/yaml.v2"
 )
 
-type Thing interface {
+type ContentItem struct {
+	Type        string                 `yaml:"type"`
+	Name        string                 `yaml:"name"`
+	Description string                 `yaml:"description"`
+	Cost        map[string]float64     `yaml:"cost"`
+	Effects     []config.Effect        `yaml:"effects"`
+	Initial     int                    `yaml:"initial"`
+	Reqs        []string               `yaml:"reqs"`
+	Properties  map[string]interface{} `yaml:"properties"`
 }
 
 type ContentSystem struct {
-	config       *config.GameConfig
-	Resources    map[string]config.Resource
-	Buildings    map[string]config.Building
-	Upgrades     map[string]config.Upgrade
-	Achievements []config.Achievement
-	Things       map[string]config.Thing
-	Shinies      map[string]config.Shiny
-	Prestige     config.Prestige
+	content           map[string]map[string]ContentItem
+	effectDefinitions map[string]config.EffectDefinition
+	pluginSystem      *PluginSystem
 }
 
 func NewContentSystem(cfg *config.GameConfig) (*ContentSystem, error) {
 	cs := &ContentSystem{
-		config:       cfg,
-		Resources:    make(map[string]config.Resource),
-		Buildings:    make(map[string]config.Building),
-		Upgrades:     make(map[string]config.Upgrade),
-		Achievements: []config.Achievement{},
-		Shinies:      make(map[string]config.Shiny),
-		Things:       make(map[string]config.Thing),
+		content:           make(map[string]map[string]ContentItem),
+		effectDefinitions: cfg.EffectDefinitions,
+		pluginSystem:      NewPluginSystem(),
 	}
 
-	err := cs.parseContent()
-	log.Println(cs.Things)
+	err := cs.parseContent(cfg.Content)
 	if err != nil {
 		return nil, err
 	}
+
 	return cs, nil
 }
 
-func (cs *ContentSystem) parseContent() error {
-	for category, content := range cs.config.Content {
-		switch category {
-		case "resources":
-			if err := cs.parseResources(content); err != nil {
+func (cs *ContentSystem) parseContent(content map[string]map[string]interface{}) error {
+	for category, items := range content {
+		cs.content[category] = make(map[string]ContentItem)
+		for name, data := range items {
+			convertedData := convertMapInterfaceToMapString(data.(map[interface{}]interface{}))
+			item, err := cs.createContentItem(name, convertedData)
+			if err != nil {
 				return err
 			}
-		case "buildings":
-			if err := cs.parseBuildings(content); err != nil {
-				return err
+			cs.content[category][name] = item
+		}
+	}
+	return nil
+}
+
+func convertMapInterfaceToMapString(m map[interface{}]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	for k, v := range m {
+		switch key := k.(type) {
+		case string:
+			switch value := v.(type) {
+			case map[interface{}]interface{}:
+				result[key] = convertMapInterfaceToMapString(value)
+			case []interface{}:
+				result[key] = convertSliceInterfaceToSliceString(value)
+			default:
+				result[key] = v
 			}
-		case "upgrades":
-			if err := cs.parseUpgrades(content); err != nil {
-				return err
-			}
-		case "achievements":
-			if err := cs.parseAchievements(content); err != nil {
-				return err
-			}
-		case "shinies":
-			if err := cs.parseShinies(content); err != nil {
-				return err
-			}
+		}
+	}
+	return result
+}
+
+func convertSliceInterfaceToSliceString(slice []interface{}) []interface{} {
+	result := make([]interface{}, len(slice))
+	for i, v := range slice {
+		switch value := v.(type) {
+		case map[interface{}]interface{}:
+			result[i] = convertMapInterfaceToMapString(value)
+		case []interface{}:
+			result[i] = convertSliceInterfaceToSliceString(value)
 		default:
-			// Treat any other category as custom content
-			if err := cs.parseThings(content); err != nil {
-				return err
+			result[i] = v
+		}
+	}
+	return result
+}
+
+func (cs *ContentSystem) createContentItem(name string, data map[string]interface{}) (ContentItem, error) {
+	var item ContentItem
+	item.Type = name
+
+	if typeStr, ok := data["name"].(string); ok {
+		item.Name = typeStr
+	}
+
+	if typeStr, ok := data["type"].(string); ok {
+		item.Type = typeStr
+	}
+
+	if desc, ok := data["description"].(string); ok {
+		item.Description = desc
+	}
+
+	if cost, ok := data["cost"].(map[string]interface{}); ok {
+		item.Cost = make(map[string]float64)
+		for resource, amount := range cost {
+			item.Cost[resource] = float64(amount.(int))
+		}
+	}
+
+	if effects, ok := data["effects"].([]interface{}); ok {
+		item.Effects = make([]config.Effect, 0)
+		for _, effect := range effects {
+			if effectMap, ok := effect.(map[string]interface{}); ok {
+				newEffect := config.Effect{}
+				if typeStr, ok := effectMap["type"].(string); ok {
+					newEffect.Type = typeStr
+				}
+				if target, ok := effectMap["target"].(string); ok {
+					newEffect.Target = target
+				}
+				if value, ok := effectMap["value"].(float64); ok {
+					newEffect.Value = value
+				}
+				if expression, ok := effectMap["expression"].(string); ok {
+					newEffect.Expression = expression
+				}
+				if condition, ok := effectMap["condition"].(string); ok {
+					newEffect.Condition = condition
+				}
+				item.Effects = append(item.Effects, newEffect)
 			}
 		}
 	}
-	return nil
-}
 
-func (cs *ContentSystem) parseThings(content map[string]interface{}) error {
-	for name, data := range content {
-		var thing config.Thing
-		if err := remarshal(data, &thing); err != nil {
-			return fmt.Errorf("error parsing resource %s: %v", name, err)
-		}
-		cs.Things[name] = thing
+	if initial, ok := data["initial"].(int); ok {
+		item.Initial = initial
 	}
-	return nil
-}
 
-func (cs *ContentSystem) parseResources(content map[string]interface{}) error {
-	for name, data := range content {
-		var resource config.Resource
-		if err := remarshal(data, &resource); err != nil {
-			return fmt.Errorf("error parsing resource %s: %v", name, err)
-		}
-		cs.Resources[name] = resource
-	}
-	return nil
-}
-
-func (cs *ContentSystem) parseBuildings(content map[string]interface{}) error {
-	for name, data := range content {
-		var building config.Building
-		if err := remarshal(data, &building); err != nil {
-			return fmt.Errorf("error parsing building %s: %v", name, err)
-		}
-		cs.Buildings[name] = building
-	}
-	return nil
-}
-
-func (cs *ContentSystem) parseUpgrades(content map[string]interface{}) error {
-	for name, data := range content {
-		var upgrade config.Upgrade
-		if err := remarshal(data, &upgrade); err != nil {
-			return fmt.Errorf("error parsing upgrade %s: %v", name, err)
-		}
-		cs.Upgrades[name] = upgrade
-	}
-	return nil
-}
-
-func (cs *ContentSystem) parseAchievements(content map[string]interface{}) error {
-	for _, data := range content {
-		var achievement config.Achievement
-		if err := remarshal(data, &achievement); err != nil {
-			return fmt.Errorf("error parsing achievement: %v", err)
-		}
-		cs.Achievements = append(cs.Achievements, achievement)
-	}
-	return nil
-}
-
-func (cs *ContentSystem) parseShinies(content map[string]interface{}) error {
-	for name, data := range content {
-		var shiny config.Shiny
-		if err := remarshal(data, &shiny); err != nil {
-			return fmt.Errorf("error parsing shiny %s: %v", name, err)
-		}
-		cs.Shinies[name] = shiny
-	}
-	return nil
-}
-
-func remarshal(in interface{}, out interface{}) error {
-	data, err := yaml.Marshal(in)
-	if err != nil {
-		return err
-	}
-	return yaml.Unmarshal(data, out)
-}
-
-type ContentType string
-
-func (cs *ContentSystem) GetContent(category, name string) (map[string]interface{}, error) {
-	if categoryContent, ok := cs.config.Content[category]; ok {
-		if content, ok := categoryContent[name]; ok {
-			return content.(map[string]interface{}), nil
+	if reqs, ok := data["reqs"].([]interface{}); ok {
+		item.Reqs = make([]string, 0)
+		for _, req := range reqs {
+			if reqStr, ok := req.(string); ok {
+				item.Reqs = append(item.Reqs, reqStr)
+			}
 		}
 	}
-	return nil, fmt.Errorf("content not found: %s in category %s", name, category)
+
+	item.Properties = data
+
+	//log.Printf("Item %+v", item)
+
+	return item, nil
 }
 
-func (cs *ContentSystem) GetAllContent(category string) map[string]interface{} {
-	return cs.config.Content[category]
+func (cs *ContentSystem) GetContent(category, name string) (ContentItem, error) {
+	if categoryContent, ok := cs.content[category]; ok {
+		if item, ok := categoryContent[name]; ok {
+			return item, nil
+		}
+	}
+	return ContentItem{}, fmt.Errorf("content not found: %s in category %s", name, category)
+}
+
+func (cs *ContentSystem) GetAllContent(category string) map[string]ContentItem {
+	return cs.content[category]
 }
 
 func (cs *ContentSystem) GetCategories() []string {
-	categories := make([]string, 0, len(cs.config.Content))
-	for category := range cs.config.Content {
+	categories := make([]string, 0, len(cs.content))
+	for category := range cs.content {
 		categories = append(categories, category)
 	}
 	return categories
 }
 
-func (cs *ContentSystem) GetResource(name string) (config.Resource, error) {
-	if resource, ok := cs.Resources[name]; ok {
-		return resource, nil
-	}
-	return config.Resource{}, fmt.Errorf("resource not found: %s", name)
+func (cs *ContentSystem) RegisterPlugin(plugin Plugin) {
+	cs.pluginSystem.RegisterPlugin(plugin)
 }
 
-func (cs *ContentSystem) GetBuilding(name string) (config.Building, error) {
-	if building, ok := cs.Buildings[name]; ok {
-		return building, nil
-	}
-	return config.Building{}, fmt.Errorf("building not found: %s", name)
-}
-
-func (cs *ContentSystem) GetUpgrade(name string) (config.Upgrade, error) {
-	if upgrade, ok := cs.Upgrades[name]; ok {
-		return upgrade, nil
-	}
-	return config.Upgrade{}, fmt.Errorf("upgrade not found: %s", name)
-}
-
-func (cs *ContentSystem) GetAchievement(name string) (config.Achievement, error) {
-	for _, achievement := range cs.Achievements {
-		if achievement.Name == name {
-			return achievement, nil
-		}
-	}
-	return config.Achievement{}, fmt.Errorf("achievement not found: %s", name)
-}
-
-func (cs *ContentSystem) GetShiny(name string) (config.Shiny, error) {
-	if shiny, ok := cs.Shinies[name]; ok {
-		return shiny, nil
-	}
-	return config.Shiny{}, fmt.Errorf("shiny not found: %s", name)
-}
-
-func (cs *ContentSystem) GetAllResources() map[string]config.Resource {
-	return cs.Resources
-}
-
-func (cs *ContentSystem) GetAllBuildings() map[string]config.Building {
-	return cs.Buildings
-}
-
-func (cs *ContentSystem) GetAllUpgrades() map[string]config.Upgrade {
-	return cs.Upgrades
-}
-
-func (cs *ContentSystem) GetAllAchievements() []config.Achievement {
-	return cs.Achievements
-}
-
-func (cs *ContentSystem) GetAllShinies() map[string]config.Shiny {
-	return cs.Shinies
+func (cs *ContentSystem) CreateCustomContent(contentType string, data map[string]interface{}) (ContentItem, error) {
+	return cs.pluginSystem.CreateContent(contentType, data)
 }

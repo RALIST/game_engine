@@ -34,10 +34,13 @@ type Game struct {
 	EventSystem     *EventSystem
 	expressionCache *Cache
 	ContentSystem   *ContentSystem
+	PluginSystem    *PluginSystem
 }
 
-type EventSystem struct {
-	listeners map[string][]func(map[string]interface{})
+type AchievementLevel struct {
+	Level     int                `yaml:"level"`
+	Condition string             `yaml:"condition"`
+	Rewards   map[string]float64 `yaml:"rewards"`
 }
 
 func NewGame(cfg *config.GameConfig) *Game {
@@ -53,6 +56,7 @@ func NewGame(cfg *config.GameConfig) *Game {
 		EventSystem:     NewEventSystem(),
 		expressionCache: NewCache(),
 		ContentSystem:   content,
+		PluginSystem:    NewPluginSystem(),
 	}
 }
 
@@ -74,15 +78,7 @@ func (g *Game) evaluateExpression(expression string, variables map[string]float6
 }
 
 func (g *Game) evaluateCondition(player *Player, condition string) bool {
-	variables := make(map[string]float64)
-	for resource, amount := range player.State.Resources {
-		variables[resource] = amount
-	}
-	for building, amount := range player.State.Buildings {
-		variables[building] = float64(amount)
-	}
-	variables["prestige"] = float64(player.State.Prestige)
-
+	variables := player.getVariables()
 	result, err := g.evaluateExpression(condition, variables)
 	if err != nil {
 		log.Printf("Error evaluating condition: %v", err)
@@ -91,14 +87,89 @@ func (g *Game) evaluateCondition(player *Player, condition string) bool {
 	return result > 0
 }
 
+func (g *Game) updatePlayer(player *Player) {
+	totalYield := g.GetTotalYield(player)
+	totalMultiplier := g.GetTotalMultiplier(player)
+	for name, _ := range player.State.Resources {
+		mult := totalMultiplier[name]
+		if mult == 0 {
+			mult = 1
+		}
+		amountToAdd := float64(totalYield[name]) * mult
+		player.AddResource(name, amountToAdd)
+	}
+}
+
+func (g *Game) GetTotalMultiplier(player *Player) map[string]float64 {
+	totalMult := map[string]float64{}
+	for name, owned := range player.State.Upgrades {
+		if !owned {
+			return nil
+		}
+
+		buildingItem, err := g.ContentSystem.GetContent("upgrades", name)
+		if err != nil {
+			log.Printf("Error getting building %s: %v", name, err)
+			continue
+		}
+
+		for _, effect := range buildingItem.Effects {
+			if effect.Type == "multiply" {
+				value := effect.Value
+				totalMult[effect.Target] += value
+			}
+		}
+	}
+	return totalMult
+}
+
+func (g *Game) GetTotalYield(player *Player) map[string]int {
+	totalYield := map[string]int{}
+	for name, amount := range player.State.Buildings {
+		if amount == 0 {
+			continue
+		}
+		buildingItem, err := g.ContentSystem.GetContent("buildings", name)
+		if err != nil {
+			log.Printf("Error getting amount %d: %v", amount, err)
+			continue
+		}
+
+		for _, effect := range buildingItem.Effects {
+			if effect.Type == "yield" {
+				variables := map[string]float64{
+					"count": float64(amount),
+				}
+
+				yieldAmount, err := g.evaluateExpression(effect.Expression, variables)
+				if err != nil {
+					log.Printf("Error evaluating yield expression for %d: %v", amount, err)
+					continue
+				}
+				totalYield[effect.Target] += int(yieldAmount)
+				log.Printf("Player %s: %s yielded %.2f %s (for %d buildings)",
+					player.ID, buildingItem.Type, yieldAmount, effect.Target, amount)
+			}
+		}
+	}
+	log.Println("Total yield:", totalYield)
+
+	return totalYield
+}
+
 func (g *Game) updateBuildings(player *Player) {
 	for buildingName, amount := range player.State.Buildings {
 		if amount == 0 {
-			return
+			continue
 		}
 
-		buildingConfig := g.ContentSystem.Buildings[buildingName]
-		for _, effect := range buildingConfig.Effects {
+		buildingItem, err := g.ContentSystem.GetContent("buildings", buildingName)
+		if err != nil {
+			log.Printf("Error getting building %s: %v", buildingName, err)
+			continue
+		}
+
+		for _, effect := range buildingItem.Effects {
 			if effect.Type == "yield" {
 				variables := map[string]float64{
 					"tier": float64(amount),
@@ -108,8 +179,10 @@ func (g *Game) updateBuildings(player *Player) {
 					log.Printf("Error evaluating yield expression for %s: %v", buildingName, err)
 					continue
 				}
-				player.AddResource(effect.Target, yieldAmount*float64(amount))
-				log.Printf("Player %s: %s yielded %.2f %s (now have %.2f)",
+				mult := player.State.Multipliers[effect.Target]
+
+				player.AddResource(effect.Target, yieldAmount*float64(amount)*mult)
+				log.Printf("Player %s: %s yielded %.2f %s (now have %d)",
 					player.ID, buildingName, yieldAmount, effect.Target, player.State.Resources[effect.Target])
 			}
 		}
@@ -119,16 +192,21 @@ func (g *Game) updateBuildings(player *Player) {
 func (g *Game) updateUpgrades(player *Player) {
 	for upgradeName, owned := range player.State.Upgrades {
 		if owned {
-			upgradeConfig := g.ContentSystem.Upgrades[upgradeName]
-			for _, effect := range upgradeConfig.Effects {
+			upgradeItem, err := g.ContentSystem.GetContent("upgrades", upgradeName)
+			if err != nil {
+				log.Printf("Error getting upgrade %s: %v", upgradeName, err)
+				continue
+			}
+
+			for _, effect := range upgradeItem.Effects {
 				if effect.Type == "multiply" {
-					currentAmount := player.State.Resources[effect.Target]
+					currentAmount := player.State.Multipliers[effect.Target]
 					newAmount, err := g.evaluateExpression(fmt.Sprintf("%f * %f", currentAmount, effect.Value), nil)
 					if err != nil {
 						log.Printf("Error evaluating upgrade effect for %s: %v", upgradeName, err)
 						continue
 					}
-					player.State.Resources[effect.Target] = newAmount
+					player.State.Multipliers[effect.Target] = newAmount
 					log.Printf("Player %s: %s multiplied %s by %.2f (now have %.2f)",
 						player.ID, upgradeName, effect.Target, effect.Value, newAmount)
 				}
@@ -137,125 +215,22 @@ func (g *Game) updateUpgrades(player *Player) {
 	}
 }
 
-func (g *Game) applyShinyEffect(player *Player, shiny config.Shiny) {
-	for _, effect := range shiny.Effects {
+func (g *Game) updateAchievements(player *Player) {
+	g.ContentSystem.GetAllContent("achievements")
+}
+
+func (g *Game) applyShinyEffect(player *Player, shinyName string) {
+	shinyItem, err := g.ContentSystem.GetContent("shinies", shinyName)
+	if err != nil {
+		log.Printf("Error getting shiny %s: %v", shinyName, err)
+		return
+	}
+
+	for _, effect := range shinyItem.Effects {
 		if effect.Type == "yield" {
 			player.AddResource(effect.Target, effect.Value)
 			log.Printf("Player %s: Shiny %s yielded %.2f %s (now have %.2f)",
-				player.ID, shiny.Name, effect.Value, effect.Target, player.State.Resources[effect.Target])
-		}
-	}
-}
-
-func (g *Game) calculateCost(baseCost map[string]float64, owned float64) map[string]float64 {
-	cost := make(map[string]float64)
-	for resource, amount := range baseCost {
-		expression := fmt.Sprintf("%f * %d", amount, owned+1)
-		result, err := g.evaluateExpression(expression, nil)
-		if err != nil {
-			log.Printf("Error calculating cost for resource %s: %v", resource, err)
-			cost[resource] = amount * (owned + 1) // Fallback to simple multiplication
-		} else {
-			cost[resource] = result
-		}
-	}
-	return cost
-}
-
-func (g *Game) PerformPrestige(player *Player) error {
-	prestigeConfig := g.ContentSystem.Prestige
-	if !player.CanAfford(prestigeConfig.Cost) {
-		return fmt.Errorf("cannot afford prestige cost")
-	}
-
-	player.SpendResources(prestigeConfig.Cost)
-	player.ResetProgress()
-
-	for _, effect := range prestigeConfig.Effects {
-		switch effect.Type {
-		case "multiply":
-			currentAmount := player.State.Resources[effect.Target]
-			player.State.Resources[effect.Target] = currentAmount * effect.Value
-		case "reset":
-			if effect.Target == "all" {
-				for resource := range player.State.Resources {
-					player.State.Resources[resource] = g.ContentSystem.Resources[resource].Initial
-				}
-			} else {
-				player.State.Resources[effect.Target] = g.ContentSystem.Resources[effect.Target].Initial
-			}
-		}
-	}
-
-	player.AddLog(fmt.Sprintf("Performed prestige: %s", prestigeConfig.Name))
-	g.EventSystem.Emit("Prestige", map[string]interface{}{
-		"PlayerID":      player.ID,
-		"PrestigeLevel": player.State.Prestige,
-	})
-
-	return nil
-}
-
-func (g *Game) Sell(player *Player, name string) error {
-	buildingAmount := player.GetBuildingAmount(name)
-	if buildingAmount <= 0 {
-		return fmt.Errorf("no %s buildings to sell", name)
-	}
-
-	buildingConfig, ok := g.ContentSystem.Buildings[name]
-	if !ok {
-		return fmt.Errorf("unknown building: %s", name)
-	}
-
-	sellPrice := g.calculateSellPrice(buildingConfig.Cost)
-	for resource, amount := range sellPrice {
-		player.AddResource(resource, amount)
-	}
-
-	player.State.Buildings[name]--
-	player.AddLog(fmt.Sprintf("Sold building: %s (now have %d)", name, player.State.Buildings[name]))
-
-	g.EventSystem.Emit("BuildingSold", map[string]interface{}{
-		"PlayerID":     player.ID,
-		"BuildingName": name,
-		"Amount":       player.State.Buildings[name],
-	})
-
-	return nil
-}
-
-func (g *Game) calculateSellPrice(baseCost map[string]float64) map[string]float64 {
-	sellPrice := make(map[string]float64)
-	for resource, amount := range baseCost {
-		sellPrice[resource] = amount * 0.5
-	}
-	return sellPrice
-}
-
-func (g *Game) updatePlayer(player *Player) {
-	g.updateBuildings(player)
-	g.updateUpgrades(player)
-	g.updateAchievements(player)
-}
-
-func (g *Game) updateAchievements(player *Player) {
-	for _, achievement := range g.ContentSystem.Achievements {
-		currentLevel := player.GetAchievementLevel(achievement.Name)
-		for _, level := range achievement.Levels {
-			if level.Level > currentLevel && g.evaluateCondition(player, level.Condition) {
-				player.SetAchievementLevel(achievement.Name, level.Level)
-				player.AddLog(fmt.Sprintf("Achievement unlocked: %s (Level %d)", achievement.Name, level.Level))
-
-				for resource, amount := range level.Rewards {
-					player.AddResource(resource, amount)
-				}
-
-				g.EventSystem.Emit("AchievementUnlocked", map[string]interface{}{
-					"PlayerID":        player.ID,
-					"AchievementName": achievement.Name,
-					"Level":           level.Level,
-				})
-			}
+				player.ID, shinyItem.Name, effect.Value, effect.Target, player.State.Resources[effect.Target])
 		}
 	}
 }
@@ -263,13 +238,15 @@ func (g *Game) updateAchievements(player *Player) {
 func (g *Game) Buy(player *Player, name string) {
 	log.Printf("Player %s is trying to buy %s", player.ID, name)
 
-	if upgrade, ok := g.ContentSystem.Upgrades[name]; ok {
-		g.buyUpgrade(player, upgrade, name)
+	item, err := g.ContentSystem.GetContent("upgrades", name)
+	if err == nil {
+		g.buyUpgrade(player, item, name)
 		return
 	}
 
-	if building, ok := g.ContentSystem.Buildings[name]; ok {
-		g.buyBuilding(player, building, name)
+	item, err = g.ContentSystem.GetContent("buildings", name)
+	if err == nil {
+		g.buyBuilding(player, item, name)
 		return
 	}
 
@@ -277,10 +254,16 @@ func (g *Game) Buy(player *Player, name string) {
 	player.AddLog("Unknown item to buy")
 }
 
-func (g *Game) buyUpgrade(player *Player, upgrade config.Upgrade, name string) {
+func (g *Game) buyUpgrade(player *Player, upgrade ContentItem, name string) {
+	owned := player.State.Upgrades[upgrade.Type]
+	if owned {
+		log.Printf("Upgrade already bought %s %s", player.ID, name)
+		return
+	}
+
 	if player.CanAfford(upgrade.Cost) {
 		player.SpendResources(upgrade.Cost)
-		player.AddUpgrade(upgrade.Name)
+		player.AddUpgrade(upgrade.Type)
 		log.Printf("Player %s bought upgrade: %s", player.ID, upgrade.Name)
 		player.AddLog(fmt.Sprintf("Bought upgrade: %s", upgrade.Name))
 
@@ -294,7 +277,7 @@ func (g *Game) buyUpgrade(player *Player, upgrade config.Upgrade, name string) {
 	}
 }
 
-func (g *Game) buyBuilding(player *Player, building config.Building, name string) {
+func (g *Game) buyBuilding(player *Player, building ContentItem, name string) {
 	cost := g.calculateCost(building.Cost, player.GetBuildingAmount(name))
 	if player.CanAfford(cost) {
 		player.SpendResources(cost)
@@ -313,20 +296,101 @@ func (g *Game) buyBuilding(player *Player, building config.Building, name string
 	}
 }
 
-func NewEventSystem() *EventSystem {
-	return &EventSystem{
-		listeners: make(map[string][]func(map[string]interface{})),
+func (g *Game) Sell(player *Player, name string) error {
+	buildingAmount := player.GetBuildingAmount(name)
+	if buildingAmount <= 0 {
+		return fmt.Errorf("no %s buildings to sell", name)
 	}
+
+	buildingItem, err := g.ContentSystem.GetContent("buildings", name)
+	if err != nil {
+		return fmt.Errorf("unknown building: %s", name)
+	}
+
+	sellPrice := g.calculateSellPrice(buildingItem.Cost)
+	for resource, amount := range sellPrice {
+		player.AddResource(resource, amount)
+	}
+
+	player.State.Buildings[name]--
+	player.AddLog(fmt.Sprintf("Sold building: %s (now have %d)", name, player.State.Buildings[name]))
+
+	g.EventSystem.Emit("BuildingSold", map[string]interface{}{
+		"PlayerID":     player.ID,
+		"BuildingName": name,
+		"Amount":       player.State.Buildings[name],
+	})
+
+	return nil
 }
 
-func (es *EventSystem) On(eventName string, listener func(map[string]interface{})) {
-	es.listeners[eventName] = append(es.listeners[eventName], listener)
-}
-
-func (es *EventSystem) Emit(eventName string, data map[string]interface{}) {
-	if listeners, ok := es.listeners[eventName]; ok {
-		for _, listener := range listeners {
-			listener(data)
+func (g *Game) calculateCost(baseCost map[string]float64, owned int) map[string]float64 {
+	cost := make(map[string]float64)
+	for resource, amount := range baseCost {
+		expression := fmt.Sprintf("%f * %d", amount, owned+1)
+		result, err := g.evaluateExpression(expression, nil)
+		if err != nil {
+			log.Printf("Error calculating cost for resource %s: %v", resource, err)
+			cost[resource] = amount * float64((owned + 1)) // Fallback to simple multiplication
+		} else {
+			cost[resource] = result
 		}
 	}
+	return cost
+}
+
+func (g *Game) calculateSellPrice(baseCost map[string]float64) map[string]float64 {
+	sellPrice := make(map[string]float64)
+	for resource, amount := range baseCost {
+		sellPrice[resource] = amount * 0.5
+	}
+	return sellPrice
+}
+
+func (g *Game) PerformPrestige(player *Player) error {
+	prestigeItem, err := g.ContentSystem.GetContent("prestige", "prestige")
+	if err != nil {
+		return fmt.Errorf("error getting prestige content: %v", err)
+	}
+
+	if !player.CanAfford(prestigeItem.Cost) {
+		return fmt.Errorf("cannot afford prestige cost")
+	}
+
+	player.SpendResources(prestigeItem.Cost)
+	player.ResetProgress()
+
+	for _, effect := range prestigeItem.Effects {
+		switch effect.Type {
+		case "multiply":
+			currentAmount := player.State.Resources[effect.Target]
+			player.State.Resources[effect.Target] = uint64(float64(currentAmount) * effect.Value)
+		case "reset":
+			if effect.Target == "all" {
+				for resource := range player.State.Resources {
+					resourceItem, err := g.ContentSystem.GetContent("resources", resource)
+					if err != nil {
+						log.Printf("Error getting resource %s: %v", resource, err)
+						continue
+					}
+					player.State.Resources[resource] = uint64(resourceItem.Initial)
+				}
+			} else {
+				resourceItem, err := g.ContentSystem.GetContent("resources", effect.Target)
+				if err != nil {
+					log.Printf("Error getting resource %s: %v", effect.Target, err)
+				} else {
+					player.State.Resources[effect.Target] = uint64(resourceItem.Initial)
+				}
+			}
+		}
+	}
+
+	player.AddLog(fmt.Sprintf("Performed prestige: %s", prestigeItem.Name))
+	g.EventSystem.Emit("Prestige", map[string]interface{}{
+		"PlayerID":      player.ID,
+		"PrestigeLevel": player.State.Prestige,
+	})
+
+	return nil
 }

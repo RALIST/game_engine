@@ -85,7 +85,7 @@ func (ge *GameEngine) BuyBuilding(playerID, buildingName string) error {
 	return ge.savePlayer(player)
 }
 
-func (ge *GameEngine) GetPlayerResources(playerID string) (map[string]float64, error) {
+func (ge *GameEngine) GetPlayerResources(playerID string) (map[string]uint64, error) {
 	player, err := ge.loadPlayer(playerID)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (ge *GameEngine) GetPlayerResources(playerID string) (map[string]float64, e
 	return player.State.Resources, nil
 }
 
-func (ge *GameEngine) GetPlayerBuildings(playerID string) (map[string]float64, error) {
+func (ge *GameEngine) GetPlayerBuildings(playerID string) (map[string]int, error) {
 	player, err := ge.loadPlayer(playerID)
 	if err != nil {
 		return nil, err

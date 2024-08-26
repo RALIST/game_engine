@@ -1,55 +1,18 @@
 package config
 
 import (
-	"os"
-
 	"gopkg.in/yaml.v2"
+	"os"
 )
 
 type GameConfig struct {
-	Content map[string]map[string]interface{} `yaml:"content"`
+	Content           map[string]map[string]interface{} `yaml:"content"`
+	EffectDefinitions map[string]EffectDefinition       `yaml:"effectDefinitions"`
 }
 
-type Thing struct {
-	Name        string             `yaml:"name"`
-	Description string             `yaml:"description"`
-	Cost        map[string]float64 `yaml:"cost"`
-	Effects     []Effect           `yaml:"effects"`
-	Initial     float64            `yaml:"initial"`
-	Reqs        []string           `yaml:"reqs"`
-}
-
-type Prestige struct {
-	Thing
-}
-
-type Resource struct {
-	Thing
-}
-
-type Upgrade struct {
-	Thing
-}
-
-type Building struct {
-	Thing
-	CostIncrease float64 `yaml:"cost_increase"`
-}
-type Achievement struct {
-	Thing
-	Levels []AchievementLevel `yaml:"levels"`
-}
-
-type AchievementLevel struct {
-	Level     int                `yaml:"level"`
-	Condition string             `yaml:"condition"`
-	Rewards   map[string]float64 `yaml:"rewards"`
-}
-
-type Shiny struct {
-	Thing
-	Frequency float64 `yaml:"frequency"`
-	Duration  float64 `yaml:"duration"`
+type EffectDefinition struct {
+	Type       string `yaml:"type"`
+	Expression string `yaml:"expression"`
 }
 
 type Effect struct {

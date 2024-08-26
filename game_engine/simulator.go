@@ -1,7 +1,9 @@
 package game_engine
 
 import (
-	"math/rand"
+	"fmt"
+	"log"
+	"time"
 )
 
 type GameSimulator struct {
@@ -9,33 +11,65 @@ type GameSimulator struct {
 }
 
 func NewGameSimulator(game *Game) *GameSimulator {
-	return &GameSimulator{game: game}
+	return &GameSimulator{
+		game: game,
+	}
 }
 
-func (gs *GameSimulator) SimulatePlayerProgress(days int) map[string]float64 {
-	player := NewPlayer("sim_player", gs.game.ContentSystem)
-
+func (gs *GameSimulator) SimulatePlayerProgress(player *Player, days int) map[string]uint64 {
 	for i := 0; i < days; i++ {
+		log.Println("Simulating day", i)
 		gs.simulateDay(player)
+		log.Printf("Simulated player %s progress at %d day: %v", player.ID, i, player.State.Resources)
 	}
 
 	return player.State.Resources
 }
 
 func (gs *GameSimulator) simulateDay(player *Player) {
-	// Симуляция действий игрока: покупка зданий, улучшений и т.д.
-	// Это упрощенная версия, вам нужно будет адаптировать ее под вашу игровую логику
-	for buildingName := range gs.game.ContentSystem.Buildings {
-		if rand.Float64() < 0.1 { // 10% шанс купить здание
-			gs.game.Buy(player, buildingName)
-		}
+	// Симуляция покупки зданий
+	buildings := gs.game.ContentSystem.GetAllContent("buildings")
+	for name, _ := range buildings {
+		gs.game.Buy(player, name)
 	}
 
-	for upgradeName := range gs.game.ContentSystem.Upgrades {
-		if rand.Float64() < 0.05 { // 5% шанс купить улучшение
-			gs.game.Buy(player, upgradeName)
-		}
+	// Симуляция покупки улучшений
+	upgrades := gs.game.ContentSystem.GetAllContent("upgrades")
+	for name, _ := range upgrades {
+		gs.game.Buy(player, name)
 	}
 
-	gs.game.State.Players[player.ID] = player
+	// Симуляция появления редких событий
+	//shinies := gs.game.ContentSystem.GetAllContent("shinies")
+	//for name, shiny := range shinies {
+	//	frequency, ok := shiny.Properties["frequency"].(float64)
+	//	if !ok {
+	//		// Если frequency не float64, пытаемся преобразовать из int
+	//		if freqInt, ok := shiny.Properties["frequency"].(int); ok {
+	//			frequency = float64(freqInt)
+	//		} else {
+	//			log.Printf("Warning: Invalid frequency for shiny %s", name)
+	//			continue
+	//		}
+	//	}
+	//	if rand.Float64() < frequency {
+	//		gs.game.applyShinyEffect(player, name)
+	//	}
+	//}
+
+	// Обновление состояния игрока
+	gs.game.updatePlayer(player)
+
+	// Симуляция прошедшего времени
+	player.State.LastSaveTime = player.State.LastSaveTime.Add(24 * time.Hour)
+}
+
+func (gs *GameSimulator) RunSimulation(numPlayers, days int) {
+	for i := 0; i < numPlayers; i++ {
+		playerID := fmt.Sprintf("sim_player_%d", i)
+		player := NewPlayer(playerID, gs.game.ContentSystem)
+		resources := gs.SimulatePlayerProgress(player, days)
+		log.Printf("Simulated player %s progress after %d days: %v", playerID, days, resources)
+	}
+
 }

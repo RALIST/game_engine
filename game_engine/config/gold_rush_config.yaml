@@ -1,10 +1,12 @@
 content:
   resources:
     gold:
+      name: Gold
+      description: A valuable resource
       initial: 1000
     money:
-      initial: 1000
-    energy:
+      name: Money
+      description: A main currency
       initial: 1000
 
   buildings:
@@ -17,20 +19,7 @@ content:
       effects:
         - type: yield
           target: gold
-          expression: 0.1 * (1 + 0.1 * tier)
-        - type: yield
-          target: money
-          expression: 0.1 * (1 + 0.1 * tier)
-    mine:
-      name: Gold Mine
-      description: A deep mine for extracting gold from the earth
-      cost:
-        money: 500
-        gold: 50
-      effects:
-        - type: yield
-          target: gold
-          expression: 10 * (1 + 0.3 * tier)
+          expression: 10 * 1.1 * count
     sluice:
       name: Sluice Box
       description: An efficient way to separate gold from sediment
@@ -40,8 +29,35 @@ content:
       effects:
         - type: yield
           target: gold
-          expression: 1 * (1 + 0.2 * tier)
-
+          expression: 20 * 1.2 * count
+    mine:
+      name: Gold Mine
+      description: A deep mine for extracting gold from the earth
+      cost:
+        money: 500
+        gold: 50
+      effects:
+        - type: yield
+          target: gold
+          expression: 100 * 1.3 * count
+    bank:
+      name: Bank
+      description: Your own bank
+      cost:
+        gold: 5000
+      effects:
+        - type: yield
+          target: money
+          expression: 100 * 1.3 * count
+    tower:
+      name: Tower
+      description: Your own tower
+      cost:
+        gold: 50000
+      effects:
+        - type: yield
+          target: money
+          expression: 1000 * 1.3 * count
   upgrades:
     prospectingSkill:
       name: Prospecting Skill
@@ -73,49 +89,49 @@ content:
           target: gold
           value: 3
 
-  achievements:
-    noviceProspector:
-      name: Novice Prospector
-      description: Pan your first gold nugget
-      condition: gold >= 1
-    goldRushFever:
-      name: Gold Rush Fever
-      description: Accumulate 100 gold
-      condition: gold >= 100
-    miningMagnate:
-      name: Mining Magnate
-      description: Own 5 of each type of mining operation
-      condition: pan >= 5 && sluice >= 5 && mine >= 5
+#  achievements:
+#    noviceProspector:
+#      name: Novice Prospector
+#      description: Pan your first gold nugget
+#      condition: gold >= 1
+#    goldRushFever:
+#      name: Gold Rush Fever
+#      description: Accumulate 100 gold
+#      condition: gold >= 100
+#    miningMagnate:
+#      name: Mining Magnate
+#      description: Own 5 of each type of mining operation
+#      condition: pan >= 5 && sluice >= 5 && mine >= 5
 
-  shinies:
-    goldNugget:
-      name: Large Gold Nugget
-      description: You've stumbled upon a large gold nugget!
-      frequency: 300
-      duration: 10
-      effects:
-        - type: yield
-          target: gold
-          value: 50
-    energyBoost:
-      name: Energy Boost
-      description: A surge of energy allows you to work harder!
-      frequency: 600
-      duration: 30
-      effects:
-        - type: yield
-          target: energy
-          value: 50
+#  shinies:
+#    goldNugget:
+#      name: Large Gold Nugget
+#      description: You've stumbled upon a large gold nugget!
+#      frequency: 300
+#      duration: 10
+#      effects:
+#        - type: yield
+#          target: gold
+#          value: 50
+#    energyBoost:
+#      name: Energy Boost
+#      description: A surge of energy allows you to work harder!
+#      frequency: 600
+#      duration: 30
+#      effects:
+#        - type: yield
+#          target: energy
+#          value: 50
 
-  others:
-    prestige:
-      name: Invest in New Territory
-      description: Start fresh in a new, more promising territory
-      cost:
-        gold: 1000
-      effects:
-        - type: multiply
-          target: gold
-          value: 1.1
-        - type: reset
-          target: all
+#  others:
+#    prestige:
+#      name: Invest in New Territory
+#      description: Start fresh in a new, more promising territory
+#      cost:
+#        gold: 1000
+#      effects:
+#        - type: multiply
+#          target: gold
+#          value: 1.1
+#        - type: reset
+#          target: all
