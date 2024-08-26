@@ -6,21 +6,7 @@ import (
 )
 
 type GameConfig struct {
-	Content           map[string]map[string]interface{} `yaml:"content"`
-	EffectDefinitions map[string]EffectDefinition       `yaml:"effectDefinitions"`
-}
-
-type EffectDefinition struct {
-	Type       string `yaml:"type"`
-	Expression string `yaml:"expression"`
-}
-
-type Effect struct {
-	Type       string  `yaml:"type"`
-	Target     string  `yaml:"target"`
-	Value      float64 `yaml:"value"`
-	Expression string  `yaml:"expression"`
-	Condition  string  `yaml:"condition"`
+	Content map[string]map[string]interface{} `yaml:"content"`
 }
 
 func LoadConfig(filename string) (*GameConfig, error) {

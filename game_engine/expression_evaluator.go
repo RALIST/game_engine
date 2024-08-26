@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strings"
 
 	"github.com/Knetic/govaluate"
 )
@@ -34,20 +35,34 @@ func (ee *ExpressionEvaluator) Evaluate(expression string) (float64, error) {
 		"round":   ee.round,
 		"roundr":  ee.roundr,
 		"pow":     ee.pow,
+		"and":     ee.and,
+		"or":      ee.or,
 	}
 
-	expr, err := govaluate.NewEvaluableExpressionWithFunctions(expression, functions)
+	prsExpr, err := ee.preprocessExpression(expression)
+	expr, err := govaluate.NewEvaluableExpressionWithFunctions(prsExpr, functions)
 	if err != nil {
 		return 0, fmt.Errorf("invalid expression: %w", err)
 	}
 
 	params := ee.getParameters(ee.player, ee.game)
 	result, err := expr.Evaluate(params)
+
 	if err != nil {
 		return 0, fmt.Errorf("error evaluating expression: %w", err)
 	}
 
-	return result.(float64), nil
+	switch v := result.(type) {
+	case float64:
+		return v, nil
+	case bool:
+		if v {
+			return 1, nil
+		}
+		return 0, nil
+	default:
+		return 0, fmt.Errorf("unexpected result type: %T", v)
+	}
 }
 
 func (ee *ExpressionEvaluator) getParameters(player *Player, game *Game) map[string]interface{} {
@@ -75,6 +90,79 @@ func (ee *ExpressionEvaluator) getParameters(player *Player, game *Game) map[str
 	params["ItemsLeft"] = 100 - float64(len(player.State.Inventory))
 
 	return params
+}
+
+func (ee *ExpressionEvaluator) preprocessExpression(expression string) (string, error) {
+	expression = strings.TrimSpace(expression)
+	if !strings.HasPrefix(expression, "if ") {
+		return expression, nil
+	}
+
+	// Remove the "if " prefix
+	expression = expression[3:]
+
+	// Find the end of the condition (matching parentheses)
+	openParens := 0
+	conditionEnd := -1
+	for i, char := range expression {
+		if char == '(' {
+			openParens++
+		} else if char == ')' {
+			openParens--
+			if openParens == 0 {
+				conditionEnd = i
+				break
+			}
+		}
+	}
+
+	if conditionEnd == -1 {
+		return "", fmt.Errorf("invalid if statement: mismatched parentheses")
+	}
+
+	condition := strings.TrimSpace(expression[:conditionEnd+1])
+	consequent := strings.TrimSpace(expression[conditionEnd+1:])
+
+	// Replace 'and' with '&&' and 'or' with '||'
+	condition = strings.ReplaceAll(condition, " and ", " && ")
+	condition = strings.ReplaceAll(condition, " or ", " || ")
+	if consequent == "" {
+		consequent = "1"
+	}
+
+	return fmt.Sprintf("%s ? %s : 0", condition, consequent), nil
+}
+
+func (ee *ExpressionEvaluator) or(args ...interface{}) (interface{}, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("or function expects at least 2 arguments")
+	}
+	for _, arg := range args {
+		val, ok := arg.(bool)
+		if !ok {
+			return nil, fmt.Errorf("or function expects boolean arguments")
+		}
+		if val {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (ee *ExpressionEvaluator) and(args ...interface{}) (interface{}, error) {
+	if len(args) < 2 {
+		return nil, fmt.Errorf("and function expects at least 2 arguments")
+	}
+	for _, arg := range args {
+		val, ok := arg.(bool)
+		if !ok {
+			return nil, fmt.Errorf("and function expects boolean arguments")
+		}
+		if !val {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func (ee *ExpressionEvaluator) have(player *Player) govaluate.ExpressionFunction {
@@ -107,13 +195,14 @@ func (ee *ExpressionEvaluator) random(args ...interface{}) (interface{}, error) 
 	if len(args) < 1 || len(args) > 2 {
 		return nil, fmt.Errorf("random function expects 1 or 2 arguments")
 	}
-	min := 0.0
-	max := args[0].(float64)
+	minN := 0.0
+	maxN := args[0].(float64)
 	if len(args) == 2 {
-		min = args[0].(float64)
-		max = args[1].(float64)
+		minN = args[0].(float64)
+		maxN = args[1].(float64)
 	}
-	return min + rand.Float64()*(max-min), nil
+
+	return float64(int(minN) + rand.Intn(int(maxN-minN+1))), nil
 }
 
 func (ee *ExpressionEvaluator) frandom(args ...interface{}) (interface{}, error) {

@@ -1,5 +1,5 @@
 content:
-  resources:
+  currencies:
     gold:
       name: Gold
       description: A valuable resource
@@ -19,7 +19,7 @@ content:
       effects:
         - type: yield
           target: gold
-          expression: 10 * 1.1 * (pan + mine) * 10
+          expression: 10 * 1.3 * pan
     sluice:
       name: Sluice Box
       description: An efficient way to separate gold from sediment
@@ -29,7 +29,7 @@ content:
       effects:
         - type: yield
           target: gold
-          expression: 20 * 1.2 * sluice
+          expression: 20 * 1.3 * sluice
     mine:
       name: Gold Mine
       description: A deep mine for extracting gold from the earth
@@ -39,7 +39,7 @@ content:
       effects:
         - type: yield
           target: gold
-          expression: 100 * 1.3 * mine
+          expression: 30 * 1.3 * mine
     bank:
       name: Bank
       description: Your own bank

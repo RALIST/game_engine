@@ -11,7 +11,7 @@ type GameItem struct {
 	Name        string                 `yaml:"name"`
 	Description string                 `yaml:"description"`
 	Cost        map[string]float64     `yaml:"cost"`
-	Effects     []config.Effect        `yaml:"effects"`
+	Effects     []Effect               `yaml:"effects"`
 	Initial     int                    `yaml:"initial"`
 	Reqs        []string               `yaml:"reqs"`
 	Properties  map[string]interface{} `yaml:"properties"`
@@ -19,17 +19,15 @@ type GameItem struct {
 
 // ContentSystem управляет всем игровым контентом
 type ContentSystem struct {
-	content           map[string]map[string]GameItem
-	effectDefinitions map[string]config.EffectDefinition
-	pluginSystem      *PluginSystem
+	content      map[string]map[string]GameItem
+	pluginSystem *PluginSystem
 }
 
 // NewContentSystem создает новую систему контента на основе конфигурации игры
 func NewContentSystem(cfg *config.GameConfig) (*ContentSystem, error) {
 	cs := &ContentSystem{
-		content:           make(map[string]map[string]GameItem),
-		effectDefinitions: cfg.EffectDefinitions,
-		pluginSystem:      NewPluginSystem(),
+		content:      make(map[string]map[string]GameItem),
+		pluginSystem: NewPluginSystem(),
 	}
 
 	if err := cs.parseContent(cfg.Content); err != nil {
@@ -127,10 +125,10 @@ func (cs *ContentSystem) createContentItem(name string, data map[string]interfac
 	}
 
 	if effects, ok := data["effects"].([]interface{}); ok {
-		item.Effects = make([]config.Effect, 0, len(effects))
+		item.Effects = make([]Effect, 0, len(effects))
 		for _, effect := range effects {
 			if effectMap, ok := effect.(map[string]interface{}); ok {
-				newEffect := config.Effect{}
+				newEffect := Effect{}
 				if typeStr, ok := effectMap["type"].(string); ok {
 					newEffect.Type = typeStr
 				}
