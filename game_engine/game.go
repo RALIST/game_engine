@@ -2,21 +2,18 @@ package game_engine
 
 import (
 	"fmt"
+	"github.com/ralist/game_engine/game_engine/config"
 	"log"
 	"time"
-
-	"github.com/ralist/game_engine/config"
 )
 
-// Interfaces
 type UIInterface interface {
 	DisplayGameState(state GameState)
 	GetUserInput() string
 }
 
 type DatabaseInterface interface {
-	SaveGame(data []byte) error
-	LoadGame() ([]byte, error)
+	LoadPlayers() ([]interface{}, error)
 	SavePlayer(playerID string, data []byte) error
 	LoadPlayer(playerID string) ([]byte, error)
 }
@@ -26,7 +23,6 @@ type CommandSystemInterface interface {
 	GetCommandList() string
 }
 
-// Structs
 type GameState struct {
 	Players map[string]*Player `json:"players"`
 	Config  *config.GameConfig `json:"config"`
@@ -44,8 +40,11 @@ type EventSystem struct {
 	listeners map[string][]func(map[string]interface{})
 }
 
-// Game methods
 func NewGame(cfg *config.GameConfig) *Game {
+	content, err := NewContentSystem(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return &Game{
 		State: GameState{
 			Players: make(map[string]*Player),
@@ -53,8 +52,7 @@ func NewGame(cfg *config.GameConfig) *Game {
 		},
 		EventSystem:     NewEventSystem(),
 		expressionCache: NewCache(),
-		ContentSystem: NewContentSystem(cfg),
-    }
+		ContentSystem:   content,
 	}
 }
 
@@ -95,7 +93,11 @@ func (g *Game) evaluateCondition(player *Player, condition string) bool {
 
 func (g *Game) updateBuildings(player *Player) {
 	for buildingName, amount := range player.State.Buildings {
-		buildingConfig := g.State.Config.Buildings[buildingName]
+		if amount == 0 {
+			return
+		}
+
+		buildingConfig := g.ContentSystem.Buildings[buildingName]
 		for _, effect := range buildingConfig.Effects {
 			if effect.Type == "yield" {
 				variables := map[string]float64{
@@ -117,7 +119,7 @@ func (g *Game) updateBuildings(player *Player) {
 func (g *Game) updateUpgrades(player *Player) {
 	for upgradeName, owned := range player.State.Upgrades {
 		if owned {
-			upgradeConfig := g.State.Config.Upgrades[upgradeName]
+			upgradeConfig := g.ContentSystem.Upgrades[upgradeName]
 			for _, effect := range upgradeConfig.Effects {
 				if effect.Type == "multiply" {
 					currentAmount := player.State.Resources[effect.Target]
@@ -161,7 +163,7 @@ func (g *Game) calculateCost(baseCost map[string]float64, owned int) map[string]
 }
 
 func (g *Game) PerformPrestige(player *Player) error {
-	prestigeConfig := g.State.Config.Prestige
+	prestigeConfig := g.ContentSystem.Prestige
 	if !player.CanAfford(prestigeConfig.Cost) {
 		return fmt.Errorf("cannot afford prestige cost")
 	}
@@ -177,10 +179,10 @@ func (g *Game) PerformPrestige(player *Player) error {
 		case "reset":
 			if effect.Target == "all" {
 				for resource := range player.State.Resources {
-					player.State.Resources[resource] = g.State.Config.Resources[resource].Initial
+					player.State.Resources[resource] = g.ContentSystem.Resources[resource].Initial
 				}
 			} else {
-				player.State.Resources[effect.Target] = g.State.Config.Resources[effect.Target].Initial
+				player.State.Resources[effect.Target] = g.ContentSystem.Resources[effect.Target].Initial
 			}
 		}
 	}
@@ -200,7 +202,7 @@ func (g *Game) Sell(player *Player, name string) error {
 		return fmt.Errorf("no %s buildings to sell", name)
 	}
 
-	buildingConfig, ok := g.State.Config.Buildings[name]
+	buildingConfig, ok := g.ContentSystem.Buildings[name]
 	if !ok {
 		return fmt.Errorf("unknown building: %s", name)
 	}
@@ -237,7 +239,7 @@ func (g *Game) updatePlayer(player *Player) {
 }
 
 func (g *Game) updateAchievements(player *Player) {
-	for _, achievement := range g.State.Config.Achievements {
+	for _, achievement := range g.ContentSystem.Achievements {
 		currentLevel := player.GetAchievementLevel(achievement.Name)
 		for _, level := range achievement.Levels {
 			if level.Level > currentLevel && g.evaluateCondition(player, level.Condition) {
@@ -261,12 +263,12 @@ func (g *Game) updateAchievements(player *Player) {
 func (g *Game) Buy(player *Player, name string) {
 	log.Printf("Player %s is trying to buy %s", player.ID, name)
 
-	if upgrade, ok := g.State.Config.Upgrades[name]; ok {
+	if upgrade, ok := g.ContentSystem.Upgrades[name]; ok {
 		g.buyUpgrade(player, upgrade, name)
 		return
 	}
 
-	if building, ok := g.State.Config.Buildings[name]; ok {
+	if building, ok := g.ContentSystem.Buildings[name]; ok {
 		g.buyBuilding(player, building, name)
 		return
 	}
@@ -296,7 +298,7 @@ func (g *Game) buyBuilding(player *Player, building config.Building, name string
 	cost := g.calculateCost(building.Cost, player.GetBuildingAmount(name))
 	if player.CanAfford(cost) {
 		player.SpendResources(cost)
-		player.AddBuilding(building.Name)
+		player.AddBuilding(name)
 		log.Printf("Player %s bought building: %s (now have %d)", player.ID, building.Name, player.GetBuildingAmount(name))
 		player.AddLog(fmt.Sprintf("Bought building: %s (now have %d)", building.Name, player.GetBuildingAmount(name)))
 
@@ -311,22 +313,6 @@ func (g *Game) buyBuilding(player *Player, building config.Building, name string
 	}
 }
 
-// GameEngine methods
-func NewGameEngine(cfg *config.GameConfig, ui UIInterface, db DatabaseInterface) *GameEngine {
-	game := NewGame(cfg)
-	engine := &GameEngine{
-		game: game,
-		ui:   ui,
-		db:   db,
-	}
-	return engine
-}
-
-func (ge *GameEngine) updatePlayer(player *Player) {
-	ge.game.updatePlayer(player)
-}
-
-// EventSystem methods
 func NewEventSystem() *EventSystem {
 	return &EventSystem{
 		listeners: make(map[string][]func(map[string]interface{})),

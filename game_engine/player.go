@@ -2,8 +2,6 @@ package game_engine
 
 import (
 	"time"
-
-	"github.com/ralist/game_engine/config"
 )
 
 const maxLogEntries = 10
@@ -30,17 +28,17 @@ type ShinyState struct {
 type Player struct {
 	ID     string      `json:"id"`
 	State  PlayerState `json:"state"`
-	Config *config.GameConfig
+	Config *ContentSystem
 }
 
 // NewPlayer создает нового игрока
-func NewPlayer(playerID string, cfg *config.GameConfig) *Player {
+func NewPlayer(playerID string, cfg *ContentSystem) *Player {
 	return &Player{
 		ID: playerID,
 		State: PlayerState{
-			Resources:         make(map[string]float64),
+			Resources:         initResources(cfg),
 			Upgrades:          make(map[string]bool),
-			Buildings:         make(map[string]int),
+			Buildings:         initBuildings(cfg),
 			Achievements:      make(map[string]bool),
 			Shinies:           make(map[string]ShinyState),
 			Prestige:          0,
@@ -50,6 +48,22 @@ func NewPlayer(playerID string, cfg *config.GameConfig) *Player {
 		},
 		Config: cfg,
 	}
+}
+
+func initResources(cfg *ContentSystem) map[string]float64 {
+	resources := make(map[string]float64)
+	for name, resource := range cfg.Resources {
+		resources[name] = resource.Initial
+	}
+	return resources
+}
+
+func initBuildings(cfg *ContentSystem) map[string]int {
+	buildings := make(map[string]int)
+	for name, building := range cfg.Buildings {
+		buildings[name] = building.Initial
+	}
+	return buildings
 }
 
 // AddUpgrade добавляет улучшение игроку

@@ -1,4 +1,4 @@
-package game_engine
+package config
 
 import (
 	"os"
@@ -40,6 +40,7 @@ type Building struct {
 	Cost        map[string]float64 `yaml:"cost"`
 	Effects     []EffectConfig     `yaml:"effects"`
 	Tier        int                `yaml:"tier"`
+	Initial     int                `yaml:"initial"`
 }
 type Achievement struct {
 	Name        string             `yaml:"name"`

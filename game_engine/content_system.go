@@ -2,8 +2,8 @@ package game_engine
 
 import (
 	"fmt"
+	"github.com/ralist/game_engine/game_engine/config"
 
-	"github.com/ralist/game_engine/config"
 	"gopkg.in/yaml.v2"
 )
 
@@ -14,6 +14,7 @@ type ContentSystem struct {
 	Upgrades      map[string]config.Upgrade
 	Achievements  []config.Achievement
 	Shinies       map[string]config.Shiny
+	Prestige      config.Prestige
 	CustomContent map[string]map[string]config.CustomContent
 }
 
@@ -32,7 +33,6 @@ func NewContentSystem(cfg *config.GameConfig) (*ContentSystem, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return cs, nil
 }
 
@@ -59,6 +59,10 @@ func (cs *ContentSystem) parseContent() error {
 			if err := cs.parseShinies(content); err != nil {
 				return err
 			}
+		case "prestige":
+			if err := cs.parsePrestige(content); err != nil {
+				return err
+			}
 		default:
 			// Treat any other category as custom content
 			if err := cs.parseCustomContent(category, content); err != nil {
@@ -67,6 +71,10 @@ func (cs *ContentSystem) parseContent() error {
 		}
 	}
 	return nil
+}
+
+func (cs *ContentSystem) parsePrestige(content interface{}) error {
+	return remarshal(content, &cs.Prestige)
 }
 
 func (cs *ContentSystem) parseCustomContent(category string, content map[string]interface{}) error {

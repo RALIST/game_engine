@@ -13,20 +13,14 @@ content:
       description: A simple tool for panning gold from rivers
       cost:
         money: 5
+      initial: 1
       effects:
         - type: yield
           target: gold
           expression: 0.1 * (1 + 0.1 * tier)
-    sluice:
-      name: Sluice Box
-      description: An efficient way to separate gold from sediment
-      cost:
-        money: 50
-        gold: 5
-      effects:
         - type: yield
-          target: gold
-          expression: 1 * (1 + 0.2 * tier)
+          target: money
+          expression: 0.1 * (1 + 0.1 * tier)
     mine:
       name: Gold Mine
       description: A deep mine for extracting gold from the earth
@@ -37,6 +31,16 @@ content:
         - type: yield
           target: gold
           expression: 10 * (1 + 0.3 * tier)
+    sluice:
+      name: Sluice Box
+      description: An efficient way to separate gold from sediment
+      cost:
+        money: 50
+        gold: 5
+      effects:
+        - type: yield
+          target: gold
+          expression: 1 * (1 + 0.2 * tier)
 
   upgrades:
     prospectingSkill:
@@ -70,13 +74,16 @@ content:
           value: 3
 
   achievements:
-    - name: Novice Prospector
+    noviceProspector:
+      name: Novice Prospector
       description: Pan your first gold nugget
       condition: gold >= 1
-    - name: Gold Rush Fever
+    goldRushFever:
+      name: Gold Rush Fever
       description: Accumulate 100 gold
       condition: gold >= 100
-    - name: Mining Magnate
+    miningMagnate:
+      name: Mining Magnate
       description: Own 5 of each type of mining operation
       condition: pan >= 5 && sluice >= 5 && mine >= 5
 

@@ -29,7 +29,7 @@ This is a flexible and extensible idle game engine written in Go. It provides a 
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/idle-game-engine.git
+   git clone https://github.com/ralist/game-engine.git
    ```
 
 2. Navigate to the project directory:
@@ -58,8 +58,8 @@ package main
 
 import (
     "log"
-    "github.com/yourusername/idle-game-engine/config"
-    "github.com/yourusername/idle-game-engine/game_engine"
+    "github.com/ralist/game-engine/config"
+    "github.com/ralist/game-engine/game_engine"
 )
 
 func main() {
