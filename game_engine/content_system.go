@@ -5,7 +5,8 @@ import (
 	"github.com/ralist/game_engine/game_engine/config"
 )
 
-type ContentItem struct {
+// GameItem представляет собой элемент игрового контента
+type GameItem struct {
 	Type        string                 `yaml:"type"`
 	Name        string                 `yaml:"name"`
 	Description string                 `yaml:"description"`
@@ -16,35 +17,40 @@ type ContentItem struct {
 	Properties  map[string]interface{} `yaml:"properties"`
 }
 
+// ContentSystem управляет всем игровым контентом
 type ContentSystem struct {
-	content           map[string]map[string]ContentItem
+	content           map[string]map[string]GameItem
 	effectDefinitions map[string]config.EffectDefinition
 	pluginSystem      *PluginSystem
 }
 
+// NewContentSystem создает новую систему контента на основе конфигурации игры
 func NewContentSystem(cfg *config.GameConfig) (*ContentSystem, error) {
 	cs := &ContentSystem{
-		content:           make(map[string]map[string]ContentItem),
+		content:           make(map[string]map[string]GameItem),
 		effectDefinitions: cfg.EffectDefinitions,
 		pluginSystem:      NewPluginSystem(),
 	}
 
-	err := cs.parseContent(cfg.Content)
-	if err != nil {
-		return nil, err
+	if err := cs.parseContent(cfg.Content); err != nil {
+		return nil, fmt.Errorf("failed to parse content: %w", err)
 	}
 
 	return cs, nil
 }
 
+// parseContent парсит контент из конфигурации
 func (cs *ContentSystem) parseContent(content map[string]map[string]interface{}) error {
 	for category, items := range content {
-		cs.content[category] = make(map[string]ContentItem)
+		cs.content[category] = make(map[string]GameItem)
 		for name, data := range items {
-			convertedData := convertMapInterfaceToMapString(data.(map[interface{}]interface{}))
-			item, err := cs.createContentItem(name, convertedData)
+			convertedData, ok := data.(map[interface{}]interface{})
+			if !ok {
+				return fmt.Errorf("invalid data format for item %s in category %s", name, category)
+			}
+			item, err := cs.createContentItem(name, convertMapInterfaceToMapString(convertedData))
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to create content item %s in category %s: %w", name, category, err)
 			}
 			cs.content[category][name] = item
 		}
@@ -52,24 +58,27 @@ func (cs *ContentSystem) parseContent(content map[string]map[string]interface{})
 	return nil
 }
 
+// convertMapInterfaceToMapString преобразует map[interface{}]interface{} в map[string]interface{}
 func convertMapInterfaceToMapString(m map[interface{}]interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
+	result := make(map[string]interface{}, len(m))
 	for k, v := range m {
-		switch key := k.(type) {
-		case string:
-			switch value := v.(type) {
-			case map[interface{}]interface{}:
-				result[key] = convertMapInterfaceToMapString(value)
-			case []interface{}:
-				result[key] = convertSliceInterfaceToSliceString(value)
-			default:
-				result[key] = v
-			}
+		key, ok := k.(string)
+		if !ok {
+			continue // Пропускаем ключи, которые не являются строками
+		}
+		switch value := v.(type) {
+		case map[interface{}]interface{}:
+			result[key] = convertMapInterfaceToMapString(value)
+		case []interface{}:
+			result[key] = convertSliceInterfaceToSliceString(value)
+		default:
+			result[key] = v
 		}
 	}
 	return result
 }
 
+// convertSliceInterfaceToSliceString преобразует []interface{} рекурсивно
 func convertSliceInterfaceToSliceString(slice []interface{}) []interface{} {
 	result := make([]interface{}, len(slice))
 	for i, v := range slice {
@@ -85,9 +94,12 @@ func convertSliceInterfaceToSliceString(slice []interface{}) []interface{} {
 	return result
 }
 
-func (cs *ContentSystem) createContentItem(name string, data map[string]interface{}) (ContentItem, error) {
-	var item ContentItem
-	item.Type = name
+// createContentItem создает элемент контента из данных
+func (cs *ContentSystem) createContentItem(name string, data map[string]interface{}) (GameItem, error) {
+	item := GameItem{
+		Type:       name,
+		Properties: data,
+	}
 
 	if typeStr, ok := data["name"].(string); ok {
 		item.Name = typeStr
@@ -102,14 +114,20 @@ func (cs *ContentSystem) createContentItem(name string, data map[string]interfac
 	}
 
 	if cost, ok := data["cost"].(map[string]interface{}); ok {
-		item.Cost = make(map[string]float64)
+		item.Cost = make(map[string]float64, len(cost))
 		for resource, amount := range cost {
-			item.Cost[resource] = float64(amount.(int))
+			if floatAmount, ok := amount.(float64); ok {
+				item.Cost[resource] = floatAmount
+			} else if intAmount, ok := amount.(int); ok {
+				item.Cost[resource] = float64(intAmount)
+			} else {
+				return GameItem{}, fmt.Errorf("invalid cost value for resource %s", resource)
+			}
 		}
 	}
 
 	if effects, ok := data["effects"].([]interface{}); ok {
-		item.Effects = make([]config.Effect, 0)
+		item.Effects = make([]config.Effect, 0, len(effects))
 		for _, effect := range effects {
 			if effectMap, ok := effect.(map[string]interface{}); ok {
 				newEffect := config.Effect{}
@@ -121,6 +139,8 @@ func (cs *ContentSystem) createContentItem(name string, data map[string]interfac
 				}
 				if value, ok := effectMap["value"].(float64); ok {
 					newEffect.Value = value
+				} else if intValue, ok := effectMap["value"].(int); ok {
+					newEffect.Value = float64(intValue)
 				}
 				if expression, ok := effectMap["expression"].(string); ok {
 					newEffect.Expression = expression
@@ -138,7 +158,7 @@ func (cs *ContentSystem) createContentItem(name string, data map[string]interfac
 	}
 
 	if reqs, ok := data["reqs"].([]interface{}); ok {
-		item.Reqs = make([]string, 0)
+		item.Reqs = make([]string, 0, len(reqs))
 		for _, req := range reqs {
 			if reqStr, ok := req.(string); ok {
 				item.Reqs = append(item.Reqs, reqStr)
@@ -146,26 +166,28 @@ func (cs *ContentSystem) createContentItem(name string, data map[string]interfac
 		}
 	}
 
-	item.Properties = data
-
-	//log.Printf("Item %+v", item)
-
 	return item, nil
 }
 
-func (cs *ContentSystem) GetContent(category, name string) (ContentItem, error) {
-	if categoryContent, ok := cs.content[category]; ok {
-		if item, ok := categoryContent[name]; ok {
-			return item, nil
-		}
+// GetContent возвращает элемент контента по категории и имени
+func (cs *ContentSystem) GetContent(category, name string) (GameItem, error) {
+	categoryContent, ok := cs.content[category]
+	if !ok {
+		return GameItem{}, fmt.Errorf("category not found: %s", category)
 	}
-	return ContentItem{}, fmt.Errorf("content not found: %s in category %s", name, category)
+	item, ok := categoryContent[name]
+	if !ok {
+		return GameItem{}, fmt.Errorf("content not found: %s in category %s", name, category)
+	}
+	return item, nil
 }
 
-func (cs *ContentSystem) GetAllContent(category string) map[string]ContentItem {
+// GetAllContent возвращает все элементы контента в указанной категории
+func (cs *ContentSystem) GetAllContent(category string) map[string]GameItem {
 	return cs.content[category]
 }
 
+// GetCategories возвращает список всех категорий контента
 func (cs *ContentSystem) GetCategories() []string {
 	categories := make([]string, 0, len(cs.content))
 	for category := range cs.content {
@@ -174,10 +196,12 @@ func (cs *ContentSystem) GetCategories() []string {
 	return categories
 }
 
+// RegisterPlugin регистрирует новый плагин в системе
 func (cs *ContentSystem) RegisterPlugin(plugin Plugin) {
 	cs.pluginSystem.RegisterPlugin(plugin)
 }
 
-func (cs *ContentSystem) CreateCustomContent(contentType string, data map[string]interface{}) (ContentItem, error) {
+// CreateCustomContent создает пользовательский контент с помощью плагинов
+func (cs *ContentSystem) CreateCustomContent(contentType string, data map[string]interface{}) (GameItem, error) {
 	return cs.pluginSystem.CreateContent(contentType, data)
 }

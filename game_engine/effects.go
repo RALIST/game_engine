@@ -34,7 +34,7 @@ func (g *Game) applyEffect(player *Player, effect Effect) {
 }
 
 func (g *Game) applyYieldEffect(player *Player, effect Effect) {
-	amount, err := g.evaluateExpression(effect.Expression, player.getVariables())
+	amount, err := g.evaluateExpression(player, effect.Expression)
 	if err != nil {
 		log.Printf("Error evaluating yield expression: %v", err)
 		return
@@ -70,12 +70,12 @@ func (g *Game) executeEffectBlock(player *Player, block EffectBlock) {
 }
 
 func (g *Game) evaluateChance(chanceString string) bool {
-	chance, err := g.evaluateExpression(chanceString, nil)
-	if err != nil {
-		log.Printf("Error evaluating chance expression: %v", err)
-		return false
-	}
-	return rand.Float64() < chance
+	//chance, err := g.evaluateExpression(chanceString, nil)
+	//if err != nil {
+	//	log.Printf("Error evaluating chance expression: %v", err)
+	//	return false
+	//}
+	return rand.Float64() < 1
 }
 
 func (g *Game) parseEffectString(effectString string) Effect {

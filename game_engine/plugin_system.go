@@ -7,7 +7,7 @@ import (
 type Plugin interface {
 	Init(game *Game)
 	GetContentTypes() []string
-	CreateContent(contentType string, data map[string]interface{}) (ContentItem, error)
+	CreateContent(contentType string, data map[string]interface{}) (GameItem, error)
 }
 
 type PluginSystem struct {
@@ -24,13 +24,13 @@ func (ps *PluginSystem) RegisterPlugin(plugin Plugin) {
 	ps.plugins = append(ps.plugins, plugin)
 }
 
-func (ps *PluginSystem) CreateContent(contentType string, data map[string]interface{}) (ContentItem, error) {
+func (ps *PluginSystem) CreateContent(contentType string, data map[string]interface{}) (GameItem, error) {
 	for _, plugin := range ps.plugins {
 		if content, err := plugin.CreateContent(contentType, data); err == nil {
 			return content, nil
 		}
 	}
-	return ContentItem{}, fmt.Errorf("no plugin found to handle content type: %s", contentType)
+	return GameItem{}, fmt.Errorf("no plugin found to handle content type: %s", contentType)
 }
 
 func (ps *PluginSystem) InitializePlugins(game *Game) {
