@@ -18,15 +18,17 @@ func NewGameSimulator(game *Game) *GameSimulator {
 
 func (gs *GameSimulator) SimulatePlayerProgress(player *Player, days int) map[string]uint64 {
 	for i := 0; i < days; i++ {
-		log.Println("Simulating day", i)
 		gs.simulateDay(player)
-		log.Printf("Simulated player %s progress at %d day: %v", player.ID, i, player.State.Resources)
+		log.Printf("   Buildings: %v", player.GetBuildings())
+		log.Printf("   Upgrades: %+v", player.GetUpgrades())
+		log.Printf("   RPS: %+v", player.State.RPS)
 	}
 
 	return player.State.Resources
 }
 
 func (gs *GameSimulator) simulateDay(player *Player) {
+	log.Println("Simulating day", player.ID)
 	// Симуляция покупки зданий
 	buildings := gs.game.ContentSystem.GetAllContent("buildings")
 	for name, _ := range buildings {
@@ -39,24 +41,6 @@ func (gs *GameSimulator) simulateDay(player *Player) {
 		gs.game.Buy(player, name)
 	}
 
-	// Симуляция появления редких событий
-	//shinies := gs.game.ContentSystem.GetAllContent("shinies")
-	//for name, shiny := range shinies {
-	//	frequency, ok := shiny.Properties["frequency"].(float64)
-	//	if !ok {
-	//		// Если frequency не float64, пытаемся преобразовать из int
-	//		if freqInt, ok := shiny.Properties["frequency"].(int); ok {
-	//			frequency = float64(freqInt)
-	//		} else {
-	//			log.Printf("Warning: Invalid frequency for shiny %s", name)
-	//			continue
-	//		}
-	//	}
-	//	if rand.Float64() < frequency {
-	//		gs.game.applyShinyEffect(player, name)
-	//	}
-	//}
-
 	// Обновление состояния игрока
 	gs.game.updatePlayer(player)
 
@@ -68,7 +52,8 @@ func (gs *GameSimulator) RunSimulation(numPlayers, days int) {
 	for i := 0; i < numPlayers; i++ {
 		playerID := fmt.Sprintf("sim_player_%d", i)
 		player := NewPlayer(playerID, gs.game.ContentSystem)
-		resources := gs.SimulatePlayerProgress(player, days)
+		gs.SimulatePlayerProgress(player, days)
+		resources := player.GetResources()
 		log.Printf("Simulated player %s progress after %d days: %v", playerID, days, resources)
 	}
 

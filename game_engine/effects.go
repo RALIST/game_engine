@@ -34,12 +34,12 @@ func (g *Game) applyEffect(player *Player, effect Effect) {
 }
 
 func (g *Game) applyYieldEffect(player *Player, effect Effect) {
-	amount, err := g.evaluateExpression(player, effect.Expression)
+	amount, err := evaluateExpression(player, effect.Expression)
 	if err != nil {
 		log.Printf("Error evaluating yield expression: %v", err)
 		return
 	}
-	player.AddResource(effect.Target, amount)
+	player.AddItem(effect.Target, amount)
 }
 
 func (g *Game) applyMultiplyEffect(player *Player, effect Effect) {
@@ -50,7 +50,6 @@ func (g *Game) applyMultiplyEffect(player *Player, effect Effect) {
 
 func (g *Game) applyGrantEffect(player *Player, effect Effect) {
 	player.SetShinyState(effect.Target, ShinyState{Active: true, LastSpawn: player.State.LastSaveTime})
-	g.applyShinyEffect(player, effect.Target)
 }
 
 func (g *Game) applySpawnEffect(player *Player, effect Effect) {

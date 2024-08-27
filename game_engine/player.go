@@ -1,27 +1,39 @@
 package game_engine
 
 import (
-	"fmt"
 	"time"
 )
 
+type PlayerItem struct {
+	ID             string
+	Type           string
+	Name           string                 `json:"name"`
+	Description    string                 `json:"description"`
+	Cost           map[string]float64     `json:"cost"`
+	RPS            map[string]float64     `json:"resourcePerSecond"`
+	ResourceEarned map[string]uint64      `json:"resourceEarned"`
+	Amount         int                    `json:"amount"`
+	Effects        []Effect               `json:"effects"`
+	Reqs           []string               `json:"reqs"`
+	Properties     map[string]interface{} `json:"properties"`
+}
+
 // PlayerState представляет текущее состояние игрока
 type PlayerState struct {
-	Resources         map[string]uint64     `json:"resources"`
-	Multipliers       map[string]float64    `json:"multipliers"`
-	Upgrades          map[string]bool       `json:"upgrades"`
-	Buildings         map[string]int        `json:"buildings"`
-	Achievements      map[string]bool       `json:"achievements"`
-	Shinies           map[string]ShinyState `json:"shinies"`
-	Prestige          int                   `json:"prestige"`
-	LastSaveTime      time.Time             `json:"lastSaveTime"`
-	Log               []string              `json:"log"`
-	AchievementLevels map[string]int        `json:"achievementLevels"`
-	Data              map[string]GameItem   `json:"data"`
-	ResourceMaxes     map[string]uint64     `json:"resourceMaxes"`
-	ResourceEarned    map[string]uint64     `json:"resourceEarned"`
-	ResourcePerSecond map[string]float64    `json:"resourcePerSecond"`
-	Inventory         []string              `json:"inventory"`
+	Resources         map[string]uint64      `json:"resources"`
+	Upgrades          map[string]bool        `json:"upgrades"`
+	Buildings         map[string]int         `json:"buildings"`
+	Achievements      map[string]bool        `json:"achievements"`
+	Shinies           map[string]ShinyState  `json:"shinies"`
+	Prestige          int                    `json:"prestige"`
+	LastSaveTime      time.Time              `json:"lastSaveTime"`
+	Log               []string               `json:"log"`
+	AchievementLevels map[string]int         `json:"achievementLevels"`
+	Items             map[string]*PlayerItem `json:"data"`
+	ResourceMaxes     map[string]uint64      `json:"resourceMaxes"`
+	ResourceEarned    map[string]uint64      `json:"resourceEarned"`
+	RPS               map[string]int         `json:"resourcePerSecond"`
+	Inventory         []string               `json:"inventory"`
 }
 
 // ShinyState представляет состояние "блестящего" объекта
@@ -32,103 +44,139 @@ type ShinyState struct {
 
 // Player представляет игрока в игре
 type Player struct {
-	ID                string      `json:"id"`
-	State             PlayerState `json:"state"`
+	ID                string       `json:"id"`
+	State             *PlayerState `json:"state"`
 	Config            *ContentSystem
 	ResourcePerSecond interface{}
 }
 
 // NewPlayer создает нового игрока с заданным ID и конфигурацией
 func NewPlayer(playerID string, cfg *ContentSystem) *Player {
-	return &Player{
+	p := &Player{
 		ID: playerID,
-		State: PlayerState{
-			Resources:         initResources(cfg),
-			Multipliers:       initMultipliers(cfg),
-			Upgrades:          initUpgrades(cfg),
-			Buildings:         initBuildings(cfg),
+		State: &PlayerState{
 			Achievements:      make(map[string]bool),
 			Shinies:           make(map[string]ShinyState),
 			Prestige:          0,
+			Items:             initItems(cfg),
 			LastSaveTime:      time.Now(),
 			AchievementLevels: make(map[string]int),
 			Log:               make([]string, 0, 10),
 		},
 		Config: cfg,
 	}
+
+	p.RecalculateState()
+	return p
 }
 
-func initResources(cfg *ContentSystem) map[string]uint64 {
-	resources := make(map[string]uint64)
-	for name, resource := range cfg.GetAllContent("resources") {
-		resources[name] = uint64(resource.Initial)
+func initItems(cfg *ContentSystem) map[string]*PlayerItem {
+	items := make(map[string]*PlayerItem)
+	for _, item := range cfg.Items {
+		playerItem := &PlayerItem{
+			ID:          item.ID,
+			Type:        item.Type,
+			Name:        item.Name,
+			Description: item.Description,
+			Cost:        item.Cost,
+			Reqs:        item.Reqs,
+			Properties:  item.Properties,
+			Amount:      item.Initial,
+			Effects:     item.Effects,
+		}
+		items[item.ID] = playerItem
 	}
-	return resources
+
+	return items
 }
 
-func initUpgrades(cfg *ContentSystem) map[string]bool {
-	upgrades := make(map[string]bool)
-	for name := range cfg.GetAllContent("upgrades") {
-		upgrades[name] = false
+func (p *Player) RecalculateState() {
+	rps := map[string]int{}
+	for _, item := range p.State.Items {
+		if item.Amount == 0 {
+			continue
+		}
+
+		for _, effect := range item.Effects {
+			if effect.Type == "yield" {
+				value, _ := evaluateExpression(p, effect.Expression)
+				rps[effect.Target] += int(value)
+			}
+		}
 	}
-	return upgrades
+
+	p.State.RPS = rps
 }
 
-func initMultipliers(cfg *ContentSystem) map[string]float64 {
-	multipliers := make(map[string]float64)
-	for name := range cfg.GetAllContent("resources") {
-		multipliers[name] = 1
-	}
-	return multipliers
-}
-
-func initBuildings(cfg *ContentSystem) map[string]int {
-	buildings := make(map[string]int)
-	for name, building := range cfg.GetAllContent("buildings") {
-		buildings[name] = building.Initial
-	}
-	return buildings
-}
-
-// AddUpgrade добавляет улучшение игроку
-func (p *Player) AddUpgrade(upgradeName string) {
-	p.State.Upgrades[upgradeName] = true
-}
-
-// AddBuilding увеличивает количество зданий определенного типа
-func (p *Player) AddBuilding(buildingName string) {
-	p.State.Buildings[buildingName]++
-}
-
-// AddResource добавляет ресурсы игроку
-func (p *Player) AddResource(resourceName string, amount float64) {
-	p.State.Resources[resourceName] += uint64(amount)
-}
-
-// RemoveResource удаляет ресурсы у игрока
-func (p *Player) RemoveResource(resourceName string, amount float64) {
-	if p.State.Resources[resourceName] < uint64(amount) {
-		p.State.Resources[resourceName] = 0
+// AddItem добавляет ресурсы игроку
+func (p *Player) AddItem(itemID string, amount float64) {
+	item := p.State.Items[itemID]
+	if item.Type == "buildings" {
+		item.Amount += int(amount)
 	} else {
-		p.State.Resources[resourceName] -= uint64(amount)
+		if item.Amount > 0 {
+			return
+		}
+
+		item.Amount += int(amount)
 	}
+}
+
+// RemoveItem удаляет ресурсы у игрока
+func (p *Player) RemoveItem(itemID string, amount float64) {
+	p.State.Items[itemID].Amount -= int(amount)
 }
 
 // CanAfford проверяет, может ли игрок позволить себе покупку
 func (p *Player) CanAfford(cost map[string]float64) bool {
 	for resource, amount := range cost {
-		if p.State.Resources[resource] < uint64(amount) {
+		res := p.State.Items[resource]
+		if res.Amount < int(amount) || amount == 0 {
 			return false
 		}
 	}
+
 	return true
 }
 
 // SpendResources тратит ресурсы игрока
 func (p *Player) SpendResources(cost map[string]float64) {
 	for resource, amount := range cost {
-		p.RemoveResource(resource, amount)
+		p.State.Items[resource].Amount -= int(amount)
 	}
+}
+
+func (p *Player) GetResources() map[string]float64 {
+	resources := make(map[string]float64)
+	for id, item := range p.State.Items {
+		if item.Type == "resources" {
+			resources[id] = float64(item.Amount)
+		}
+	}
+
+	return resources
+}
+
+func (p *Player) GetBuildings() map[string]float64 {
+	resources := make(map[string]float64)
+	for id, item := range p.State.Items {
+		if item.Type == "buildings" {
+			resources[id] = float64(item.Amount)
+		}
+	}
+
+	return resources
+}
+
+func (p *Player) GetUpgrades() map[string]float64 {
+	resources := make(map[string]float64)
+	for id, item := range p.State.Items {
+		if item.Type == "upgrades" {
+			resources[id] = float64(item.Amount)
+		}
+	}
+
+	return resources
 }
 
 // AddLog добавляет сообщение в лог игрока
@@ -156,9 +204,19 @@ func (p *Player) ResetProgress() {
 	p.AddLog("You have prestiged! All your progress has been reset, but you now earn more resources.")
 }
 
-// GetBuildingAmount возвращает количество зданий определенного типа
-func (p *Player) GetBuildingAmount(buildingName string) int {
-	return p.State.Buildings[buildingName]
+// GetItemAmount возвращает количество зданий определенного типа
+func (p *Player) GetItemAmount(itemID string) int {
+	for _, item := range p.State.Items {
+		if item.ID == itemID {
+			return item.Amount
+		}
+	}
+
+	return 0
+}
+
+func (p *Player) GetItem(itemID string) *PlayerItem {
+	return p.State.Items[itemID]
 }
 
 // HasUpgrade проверяет, есть ли у игрока определенное улучшение
@@ -194,32 +252,4 @@ func (p *Player) GetAchievementLevel(achievementName string) int {
 // SetAchievementLevel устанавливает уровень достижения
 func (p *Player) SetAchievementLevel(achievementName string, level int) {
 	p.State.AchievementLevels[achievementName] = level
-}
-
-// GetVariables возвращает текущие переменные игрока для оценки выражений
-func (p *Player) GetVariables() map[string]float64 {
-	variables := make(map[string]float64, len(p.State.Resources)+len(p.State.Buildings)+1)
-	for resource, amount := range p.State.Resources {
-		variables[resource] = float64(amount)
-	}
-	for building, amount := range p.State.Buildings {
-		variables[building] = float64(amount)
-	}
-	variables["prestige"] = float64(p.State.Prestige)
-	return variables
-}
-
-// ValidateState проверяет состояние игрока на корректность
-func (p *Player) ValidateState() error {
-	if p.ID == "" {
-		return fmt.Errorf("player ID is empty")
-	}
-	if len(p.State.Resources) == 0 {
-		return fmt.Errorf("player has no resources")
-	}
-	if len(p.State.Multipliers) == 0 {
-		return fmt.Errorf("player has no multipliers")
-	}
-	// Добавьте дополнительные проверки по мере необходимости
-	return nil
 }

@@ -14,10 +14,9 @@ type ExpressionEvaluator struct {
 	game   *Game
 }
 
-func NewExpressionEvaluator(player *Player, game *Game) *ExpressionEvaluator {
+func NewExpressionEvaluator(player *Player) *ExpressionEvaluator {
 	return &ExpressionEvaluator{
 		player: player,
-		game:   game,
 	}
 }
 
@@ -68,23 +67,11 @@ func (ee *ExpressionEvaluator) Evaluate(expression string) (float64, error) {
 func (ee *ExpressionEvaluator) getParameters(player *Player, game *Game) map[string]interface{} {
 	params := make(map[string]interface{})
 
-	for name, amount := range player.State.Resources {
-		params[name] = amount
+	for name, item := range player.State.Items {
+		params[name] = item.Amount
 		params[name+":max"] = player.State.ResourceMaxes[name]
 		params[name+":earned"] = player.State.ResourceEarned[name]
-		params[name+":ps"] = player.State.ResourcePerSecond[name]
-	}
-
-	for name, amount := range player.State.Buildings {
-		params[name] = float64(amount)
-	}
-
-	for name, owned := range player.State.Upgrades {
-		params[name] = boolToFloat(owned)
-	}
-
-	for name, achieved := range player.State.Achievements {
-		params[name] = boolToFloat(achieved)
+		params[name+":ps"] = player.State.RPS[name]
 	}
 
 	params["ItemsLeft"] = 100 - float64(len(player.State.Inventory))

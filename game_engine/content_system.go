@@ -7,7 +7,8 @@ import (
 
 // GameItem представляет собой элемент игрового контента
 type GameItem struct {
-	Type        string                 `yaml:"type"`
+	ID          string
+	Type        string
 	Name        string                 `yaml:"name"`
 	Description string                 `yaml:"description"`
 	Cost        map[string]float64     `yaml:"cost"`
@@ -20,6 +21,7 @@ type GameItem struct {
 // ContentSystem управляет всем игровым контентом
 type ContentSystem struct {
 	content      map[string]map[string]GameItem
+	Items        []GameItem
 	pluginSystem *PluginSystem
 }
 
@@ -47,9 +49,11 @@ func (cs *ContentSystem) parseContent(content map[string]map[string]interface{})
 				return fmt.Errorf("invalid data format for item %s in category %s", name, category)
 			}
 			item, err := cs.createContentItem(name, convertMapInterfaceToMapString(convertedData))
+			item.Type = category
 			if err != nil {
 				return fmt.Errorf("failed to create content item %s in category %s: %w", name, category, err)
 			}
+			cs.Items = append(cs.Items, item)
 			cs.content[category][name] = item
 		}
 	}
@@ -95,20 +99,18 @@ func convertSliceInterfaceToSliceString(slice []interface{}) []interface{} {
 // createContentItem создает элемент контента из данных
 func (cs *ContentSystem) createContentItem(name string, data map[string]interface{}) (GameItem, error) {
 	item := GameItem{
-		Type:       name,
+		ID:         name,
 		Properties: data,
 	}
 
 	if typeStr, ok := data["name"].(string); ok {
 		item.Name = typeStr
-	}
-
-	if typeStr, ok := data["type"].(string); ok {
-		item.Type = typeStr
+		delete(data, "name")
 	}
 
 	if desc, ok := data["description"].(string); ok {
 		item.Description = desc
+		delete(data, "description")
 	}
 
 	if cost, ok := data["cost"].(map[string]interface{}); ok {
@@ -122,6 +124,7 @@ func (cs *ContentSystem) createContentItem(name string, data map[string]interfac
 				return GameItem{}, fmt.Errorf("invalid cost value for resource %s", resource)
 			}
 		}
+		delete(data, "cost")
 	}
 
 	if effects, ok := data["effects"].([]interface{}); ok {
@@ -149,10 +152,13 @@ func (cs *ContentSystem) createContentItem(name string, data map[string]interfac
 				item.Effects = append(item.Effects, newEffect)
 			}
 		}
+
+		delete(data, "effects")
 	}
 
 	if initial, ok := data["initial"].(int); ok {
 		item.Initial = initial
+		delete(data, "initial")
 	}
 
 	if reqs, ok := data["reqs"].([]interface{}); ok {
@@ -162,8 +168,11 @@ func (cs *ContentSystem) createContentItem(name string, data map[string]interfac
 				item.Reqs = append(item.Reqs, reqStr)
 			}
 		}
+
+		delete(data, "reqs")
 	}
 
+	item.Properties = data
 	return item, nil
 }
 

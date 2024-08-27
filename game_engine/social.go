@@ -22,13 +22,13 @@ func (ss *SocialSystem) Trade(fromPlayer, toPlayer *Player, offerResources, requ
 	}
 
 	for resource, amount := range offerResources {
-		fromPlayer.RemoveResource(resource, amount)
-		toPlayer.AddResource(resource, amount)
+		fromPlayer.RemoveItem(resource, amount)
+		toPlayer.AddItem(resource, amount)
 	}
 
 	for resource, amount := range requestResources {
-		toPlayer.RemoveResource(resource, amount)
-		fromPlayer.AddResource(resource, amount)
+		toPlayer.RemoveItem(resource, amount)
+		fromPlayer.AddItem(resource, amount)
 	}
 
 	ss.game.EventSystem.Emit("TradeConducted", map[string]interface{}{
